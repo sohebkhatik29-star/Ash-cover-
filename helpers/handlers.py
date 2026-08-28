@@ -33,21 +33,79 @@ def bold_entities(text: str):
 
 
 def looks_like_html(text: str) -> bool:
-    """True if caption contains Telegram HTML tags."""
     if not text:
         return False
     return bool(re.search(
-        r"<(a|b|i|u|s|code|pre|blockquote|tg-spoiler|tg-emoji)\b|/?(a|b|i|u|s|code|pre|blockquote)>" ,
+        r"<(a|b|i|u|s|code|pre|blockquote|tg-spoiler|tg-emoji|strong|em)\b|/?(a|b|i|u|s|code|pre|blockquote|strong|em)>" ,
         text,
         re.I
     ))
+
+
+def sanitize_telegram_html(text: str) -> str:
+    """
+    Clean HTML so Telegram can parse it.
+    - Fix broken tags split across newlines
+    - Remove invalid nesting of <b> around <blockquote>
+    - Ensure common tags are properly closed
+    """
+    if not text:
+        return text
+
+    # Fix tags broken by newlines: </\nb>  -> </b>
+    text = re.sub(r"</\s*\n\s*([a-zA-Z]+)>" , r"</\1>", text)
+    text = re.sub(r"<\s*\n\s*([a-zA-Z]+)" , r"<\1", text)
+
+    # Collapse whitespace inside tags
+    text = re.sub(r"<(a|b|i|u|s|code|pre|blockquote|strong|em)(\s[^>]*)?>\s*" , lambda m: m.group(0).rstrip() + ("" if m.group(0).endswith(">") else ""), text)
+
+    # Telegram does not like <b><blockquote>...</blockquote></b>
+    # Convert to <blockquote><b>...</b></blockquote> or just blockquote
+    text = re.sub(
+        r"<b>\s*<blockquote>(.*?)</blockquote>\s*</b>",
+        r"<blockquote>\1</blockquote>",
+        text,
+        flags=re.I | re.S
+    )
+    text = re.sub(
+        r"<strong>\s*<blockquote>(.*?)</blockquote>\s*</strong>",
+        r"<blockquote>\1</blockquote>",
+        text,
+        flags=re.I | re.S
+    )
+
+    # Fix double-nested b around blockquote left as: </blockquote></b><b><blockquote>
+    text = re.sub(r"</blockquote>\s*</b>\s*<b>\s*<blockquote>", "</blockquote>\n<blockquote>", text, flags=re.I)
+
+    # Remove empty tags
+    text = re.sub(r"<(b|i|u|s|strong|em)>\s*</\1>", "", text, flags=re.I)
+
+    # Ensure <a href="..."> has quotes
+    text = re.sub(
+        r'<a\s+href=([^"\s>]+)(\s|>)',
+        r'<a href="\1"\2',
+        text,
+        flags=re.I
+    )
+
+    return text.strip()
+
+
+def strip_html_tags(text: str) -> str:
+    """Remove all HTML tags for plain-text fallback."""
+    if not text:
+        return text
+    # Keep link URLs readable
+    text = re.sub(r'<a\s+href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', r'\2 (\1)', text, flags=re.I | re.S)
+    text = re.sub(r'<[^>]+>', '', text)
+    text = html.unescape(text)
+    return text.strip()
 
 
 def apply_caption_template(template: str, filename: str = "", original: str = "") -> str:
     if not template:
         return original or ""
     name = filename or ""
-    # strip extension for cleaner display if user wants
     name_no_ext = re.sub(r"\.(mp4|mkv|avi|mov|webm|m4v)$", "", name, flags=re.I) if name else ""
     result = template
     for key, val in [
@@ -171,6 +229,19 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ Thumbnail {action}!\n\nNow send any video to apply this cover.", parse_mode="HTML")
 
 
+async def _build_media(video_id, cover, caption, use_html):
+    """Build InputMediaVideo with HTML or plain caption."""
+    kwargs = {
+        "media": video_id,
+        "caption": caption or None,
+        "supports_streaming": True,
+        "cover": cover,
+    }
+    if use_html and caption:
+        kwargs["parse_mode"] = "HTML"
+    return InputMediaVideo(**kwargs)
+
+
 async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     username = update.effective_user.username or "No Username"
@@ -190,7 +261,6 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not filename:
-        # try from caption or default
         filename = (update.message.caption or "").split("\n")[0][:80] or "Video"
 
     font_style = get_font_style(user_id)
@@ -205,64 +275,89 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     use_html = looks_like_html(raw_caption)
 
     if use_html:
-        # HTML template → keep tags, no unicode font transform
-        new_caption = raw_caption
-        caption_entities = None
-        parse_mode = "HTML"
+        new_caption = sanitize_telegram_html(raw_caption)
+        parse_mode_html = True
     else:
         new_caption = format_caption(raw_caption, font_style) if raw_caption else ""
-        caption_entities = bold_entities(new_caption) if font_style == "bold" and new_caption else None
-        parse_mode = None
+        parse_mode_html = False
 
     dest_chan = get_destination_channel(user_id)
     send_mode = get_send_mode(user_id)
 
-    media_kwargs = {
-        "media": video_id,
-        "caption": new_caption or None,
-        "supports_streaming": True,
-        "cover": cover,
-    }
-    if use_html:
-        media_kwargs["parse_mode"] = "HTML"
-    elif caption_entities:
-        media_kwargs["caption_entities"] = caption_entities
+    async def try_edit_media(caption_text, as_html):
+        media = await _build_media(video_id, cover, caption_text, as_html)
+        await context.bot.edit_message_media(
+            chat_id=update.effective_chat.id,
+            message_id=status_msg.message_id,
+            media=media
+        )
 
-    media = InputMediaVideo(**media_kwargs)
+    async def try_send_channel(caption_text, as_html):
+        dest_chat_id = dest_chan["channel_id"]
+        kwargs = {
+            "chat_id": dest_chat_id,
+            "video": video_id,
+            "caption": caption_text or None,
+            "supports_streaming": True,
+            "thumbnail": cover,
+        }
+        if as_html and caption_text:
+            kwargs["parse_mode"] = "HTML"
+        await context.bot.send_video(**kwargs)
 
     try:
         sent_to_user = False
+        final_caption = new_caption
+        final_html = parse_mode_html
+
         if send_mode in ("both", "user_only") or not dest_chan:
-            await context.bot.edit_message_media(
-                chat_id=update.effective_chat.id,
-                message_id=status_msg.message_id,
-                media=media
-            )
-            sent_to_user = True
+            try:
+                await try_edit_media(new_caption, parse_mode_html)
+                sent_to_user = True
+            except Exception as parse_err:
+                err_str = str(parse_err).lower()
+                if parse_mode_html and ("parse" in err_str or "entities" in err_str or "tag" in err_str):
+                    # HTML failed → fallback plain text
+                    logger.warning(f"HTML caption failed, falling back to plain: {parse_err}")
+                    final_caption = strip_html_tags(raw_caption)
+                    final_html = False
+                    try:
+                        await try_edit_media(final_caption, False)
+                        sent_to_user = True
+                        await update.message.reply_text(
+                            "⚠️ HTML caption me error tha, plain text se bhej diya.\n"
+                            "Template thik karo: Settings → Auto Caption → Change",
+                            parse_mode="HTML"
+                        )
+                    except Exception as e2:
+                        raise e2
+                else:
+                    raise parse_err
 
         dest_success = False
         if dest_chan and send_mode in ("both", "channel_only"):
             try:
-                dest_chat_id = dest_chan["channel_id"]
-                send_kwargs = {
-                    "chat_id": dest_chat_id,
-                    "video": video_id,
-                    "caption": new_caption or None,
-                    "supports_streaming": True,
-                    "thumbnail": cover,
-                }
-                if use_html:
-                    send_kwargs["parse_mode"] = "HTML"
-                elif caption_entities:
-                    send_kwargs["caption_entities"] = caption_entities
-                await context.bot.send_video(**send_kwargs)
+                await try_send_channel(final_caption, final_html)
                 dest_success = True
             except Exception as chan_err:
-                logger.error(f"Error posting to channel: {chan_err}")
-                await update.message.reply_text(
-                    f"⚠️ Channel post failed:\n<code>{html.escape(str(chan_err)[:120])}</code>\n\nEnsure bot is Admin with Post Messages.",
-                    parse_mode="HTML"
-                )
+                err_str = str(chan_err).lower()
+                if final_html and ("parse" in err_str or "entities" in err_str or "tag" in err_str):
+                    try:
+                        plain = strip_html_tags(raw_caption)
+                        await try_send_channel(plain, False)
+                        dest_success = True
+                    except Exception as e2:
+                        logger.error(f"Channel post failed: {e2}")
+                        await update.message.reply_text(
+                            f"⚠️ Channel post failed:\n<code>{html.escape(str(e2)[:120])}</code>",
+                            parse_mode="HTML"
+                        )
+                else:
+                    logger.error(f"Channel post failed: {chan_err}")
+                    await update.message.reply_text(
+                        f"⚠️ Channel post failed:\n<code>{html.escape(str(chan_err)[:120])}</code>\n\nEnsure bot is Admin with Post Messages.",
+                        parse_mode="HTML"
+                    )
 
         if not sent_to_user and dest_success:
             chan_title = html.escape(str(dest_chan.get("channel_title", "Channel")))
@@ -277,8 +372,8 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"🎥 <b>Video Processed</b>\n"
                     f"👤 User: <code>{user_id}</code> (@{html.escape(username)})\n"
                     f"✍️ Font: <code>{html.escape(get_font_name(font_style))}</code>\n"
-                    f"📝 Mode: {'HTML' if use_html else 'Font'}\n"
-                    f"📝 Caption: {html.escape((new_caption or 'No Caption')[:80])}"
+                    f"📝 Mode: {'HTML' if final_html else 'Plain/Font'}\n"
+                    f"📝 Caption: {html.escape((final_caption or 'No Caption')[:80])}"
                 )
                 await context.bot.send_video(
                     chat_id=LOG_CHANNEL_ID, video=video_id,
@@ -290,9 +385,15 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Video processing failed: {e}", exc_info=True)
         try:
-            await status_msg.edit_text(f"❌ Processing Failed: <code>{html.escape(str(e)[:100])}</code>", parse_mode="HTML")
+            await status_msg.edit_text(
+                f"❌ Processing Failed: <code>{html.escape(str(e)[:150])}</code>",
+                parse_mode="HTML"
+            )
         except Exception:
-            await update.message.reply_text(f"❌ Processing Failed: <code>{html.escape(str(e)[:100])}</code>", parse_mode="HTML")
+            await update.message.reply_text(
+                f"❌ Processing Failed: <code>{html.escape(str(e)[:150])}</code>",
+                parse_mode="HTML"
+            )
 
 
 async def text_and_channel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -308,11 +409,13 @@ async def text_and_channel_handler(update: Update, context: ContextTypes.DEFAULT
             context.user_data.pop("waiting_for", None)
             return await update.message.reply_text("❌ Caption setup cancelled.", parse_mode="HTML")
 
-        save_custom_caption(user_id, raw)
+        # Sanitize before save so future videos work
+        cleaned = sanitize_telegram_html(raw) if looks_like_html(raw) else raw
+        save_custom_caption(user_id, cleaned)
         context.user_data.pop("waiting_for", None)
 
-        is_html = looks_like_html(raw)
-        preview = html.escape(raw[:400])
+        is_html = looks_like_html(cleaned)
+        preview = html.escape(cleaned[:400])
         mode_note = "🔗 HTML mode (links + bold will work)" if is_html else "✍️ Plain / Font mode"
 
         text = (
@@ -328,6 +431,15 @@ async def text_and_channel_handler(update: Update, context: ContextTypes.DEFAULT
             [InlineKeyboardButton("📝 View / Edit", callback_data="submenu_caption")],
             [InlineKeyboardButton("⚙️ Settings", callback_data="menu_settings")]
         ])
+
+        # Try delete the old prompt message for cleaner UI
+        prompt_id = context.user_data.pop("caption_prompt_msg_id", None)
+        if prompt_id:
+            try:
+                await context.bot.delete_message(chat_id=update.effective_chat.id, message_id=prompt_id)
+            except Exception:
+                pass
+
         try:
             return await update.message.reply_text(text, reply_markup=kb, parse_mode="HTML")
         except Exception as e:
