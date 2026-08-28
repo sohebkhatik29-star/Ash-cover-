@@ -9,7 +9,7 @@ from telegram.ext import ContextTypes
 from config import HOME_MENU_BANNER_URL, OWNER_USERNAME
 from database import (
     has_thumbnail, get_font_style, get_destination_channel,
-    get_send_mode, is_admin
+    get_send_mode, is_admin, get_custom_caption
 )
 from font import get_font_name, format_caption, FONT_STYLES
 
@@ -43,6 +43,7 @@ def get_home_menu_text() -> str:
         "✅ 𝐎ɴᴇ-𝐂ʟɪᴄᴋ 𝐀ᴘᴘʟɪᴄᴀᴛɪᴏɴ\n"
         "✅ 𝐇ɪɢʜ-𝐐ᴜᴀʟɪᴛʏ 𝐂ᴏᴠᴇʀs\n"
         "✅ 𝟏𝟑+ 𝐂ᴀᴘᴛɪᴏɴ 𝐅ᴏɴᴛ 𝐒ᴛʏʟᴇs\n"
+        "✅ 𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ 𝐓ᴇᴍᴘʟᴀᴛᴇ\n"
         "✅ 𝐀ᴜᴛᴏ-𝐒ᴇɴᴅ 𝐓ᴏ 𝐂ʜᴀɴɴᴇʟ\n\n"
         "💡 <b>𝐂ᴏᴍᴍᴀɴᴅs:</b>\n"
         "/help – 𝐂ᴏᴍᴘʟᴇᴛᴇ 𝐆ᴜɪᴅᴇ\n"
@@ -60,15 +61,18 @@ def get_settings_menu(user_id: int):
     font_name = get_font_name(font_key)
     dest_chan = get_destination_channel(user_id)
     send_mode = get_send_mode(user_id)
+    custom_cap = get_custom_caption(user_id)
     
     mode_str = "📤 𝐁ᴏᴛʜ (𝐂ʜᴀᴛ + 𝐂ʜᴀɴɴᴇʟ)" if send_mode == "both" else ("📢 𝐂ʜᴀɴɴᴇʟ 𝐎ɴʟʏ" if send_mode == "channel_only" else "👤 𝐂ʜᴀᴛ 𝐎ɴʟʏ")
     chan_str = f"✅ {dest_chan.get('channel_title', 'Channel')}" if dest_chan else "❌ 𝐍ᴏᴛ 𝐂ᴏɴꜰɪɢᴜʀᴇᴅ"
+    cap_str = "✅ 𝐒ᴇᴛ" if custom_cap else "❌ 𝐍ᴏᴛ 𝐒ᴇᴛ"
 
     text = (
         "⚙️ <b>𝐁ᴏᴛ 𝐒ᴇᴛᴛɪɴɢs & 𝐏ʀᴇꜰᴇʀᴇɴᴄᴇs</b>\n\n"
         f"👤 <b>𝐔sᴇʀ 𝐈𝐃:</b> <code>{user_id}</code>\n\n"
         f"🖼️ <b>𝐓ʜᴜᴍʙɴᴀɪʟ:</b> {thumb_status}\n"
         f"✍️ <b>𝐂ᴀᴘᴛɪᴏɴ 𝐅ᴏɴᴛ:</b> <code>{font_name}</code>\n"
+        f"📝 <b>𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ:</b> {cap_str}\n"
         f"📢 <b>𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ:</b> {chan_str}\n"
         f"📤 <b>𝐃ᴇʟɪᴠᴇʀʏ 𝐌ᴏᴅᴇ:</b> <code>{mode_str}</code>\n\n"
         "𝐒ᴇʟᴇᴄᴛ ᴀɴ ᴏᴘᴛɪᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴄᴏɴꜰɪɢᴜʀᴇ:"
@@ -76,9 +80,51 @@ def get_settings_menu(user_id: int):
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🖼 𝐓ʜᴜᴍʙɴᴀɪʟ", callback_data="submenu_thumbnails"),
          InlineKeyboardButton("✍️ 𝐂ᴀᴘᴛɪᴏɴ 𝐅ᴏɴᴛ", callback_data="submenu_fonts")],
+        [InlineKeyboardButton("📝 𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ", callback_data="submenu_caption")],
         [InlineKeyboardButton("📢 𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ", callback_data="submenu_channel")],
         [InlineKeyboardButton("⬅️ 𝐁ᴀᴄᴋ", callback_data="menu_back")]
     ])
+    return text, kb
+
+
+def get_caption_menu(user_id: int):
+    """Build Auto Caption template menu"""
+    custom_cap = get_custom_caption(user_id)
+    if custom_cap:
+        preview = custom_cap[:200] + ("..." if len(custom_cap) > 200 else "")
+        text = (
+            "📝 <b>𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ 𝐓ᴇᴍᴘʟᴀᴛᴇ</b>\n\n"
+            "✅ <b>𝐒ᴛᴀᴛᴜs:</b> 𝐀ᴄᴛɪᴠᴇ\n\n"
+            f"<b>𝐘ᴏᴜʀ 𝐓ᴇᴍᴘʟᴀᴛᴇ:</b>\n"
+            f"<blockquote>{preview}</blockquote>\n\n"
+            "<b>📌 𝐏ʟᴀᴄᴇʜᴏʟᴅᴇʀs:</b>\n"
+            "• <code>{filename}</code> → 𝐕ɪᴅᴇᴏ ꜰɪʟᴇ ɴᴀᴍᴇ\n"
+            "• <code>{original}</code> → 𝐎ʀɪɢɪɴᴀʟ ᴄᴀᴘᴛɪᴏɴ (ɪꜰ ᴀɴʏ)\n\n"
+            "💡 <i>𝐇ᴀʀ ᴠɪᴅᴇᴏ ᴘᴇ ʏᴇ ᴛᴇᴍᴘʟᴀᴛᴇ ᴀᴜᴛᴏ ᴀᴘᴘʟʏ ʜᴏɢᴀ + ʏᴏᴜʀ ꜰᴏɴᴛ sᴛʏʟᴇ.</i>"
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✏️ 𝐂ʜᴀɴɢᴇ 𝐓ᴇᴍᴘʟᴀᴛᴇ", callback_data="cap_set_prompt")],
+            [InlineKeyboardButton("🗑️ 𝐑ᴇᴍᴏᴠᴇ 𝐂ᴀᴘᴛɪᴏɴ", callback_data="cap_delete")],
+            [InlineKeyboardButton("⬅️ 𝐁ᴀᴄᴋ 𝐓ᴏ 𝐒ᴇᴛᴛɪɴɢs", callback_data="menu_settings")]
+        ])
+    else:
+        text = (
+            "📝 <b>𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ 𝐓ᴇᴍᴘʟᴀᴛᴇ</b>\n\n"
+            "❌ <b>𝐒ᴛᴀᴛᴜs:</b> 𝐍ᴏᴛ 𝐒ᴇᴛ\n\n"
+            "<b>🚀 𝐖ʜᴀᴛ ɪs ᴛʜɪs?</b>\n"
+            "𝐀ᴘɴᴀ ᴄᴜsᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ ᴛᴇᴍᴘʟᴀᴛᴇ sᴀᴠᴇ ᴋᴀʀᴏ. 𝐇ᴀʀ ᴠɪᴅᴇᴏ ᴘᴇ ʏᴇ ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ ʟᴀɢ ᴊᴀʏᴇɢᴀ.\n\n"
+            "<b>📌 𝐏ʟᴀᴄᴇ𝐡ᴏ𝐥ᴅᴇ𝐫s (ᴜsᴇ ᴋᴀʀ sᴀᴋᴛᴇ ʜᴏ):</b>\n"
+            "• <code>{filename}</code> → 𝐕ɪᴅᴇᴏ ꜰɪʟᴇ ɴᴀᴍᴇ\n"
+            "• <code>{original}</code> → 𝐎ʀɪɢɪɴᴀʟ ᴄᴀᴘᴛɪᴏɴ\n\n"
+            "<b>📌 𝐄xᴀᴍᴘʟᴇ:</b>\n"
+            "<code>{filename}\n\n📢 @MoviesGroupG3</code>\n\n"
+            "𝐘ᴀ:\n"
+            "<code>🎬 {filename}\n{original}\n\n🔗 Join: @MoviesGroupG3</code>"
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("➕ 𝐒ᴇᴛ 𝐂ᴀᴘᴛɪᴏɴ 𝐓ᴇᴍᴘʟᴀᴛᴇ", callback_data="cap_set_prompt")],
+            [InlineKeyboardButton("⬅️ 𝐁ᴀᴄᴋ 𝐓ᴏ 𝐒ᴇᴛᴛɪɴɢs", callback_data="menu_settings")]
+        ])
     return text, kb
 
 

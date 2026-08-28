@@ -10,12 +10,13 @@ from database import (
     get_thumbnail, delete_thumbnail,
     save_font_style, get_destination_channel,
     delete_destination_channel, save_send_mode, get_send_mode,
+    delete_custom_caption,
     is_admin, get_total_users, get_banned_users_count
 )
 from font import get_font_name
 from helpers.menus import (
     get_home_menu_text, get_home_menu_markup,
-    get_settings_menu, get_fonts_menu, get_channel_menu
+    get_settings_menu, get_fonts_menu, get_channel_menu, get_caption_menu
 )
 
 logger = logging.getLogger(__name__)
@@ -49,8 +50,9 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
                 "📖 <b>𝐂ᴏᴍᴘʟᴇᴛᴇ 𝐆ᴜɪᴅᴇ & 𝐅ᴇᴀᴛᴜʀᴇs</b>\n\n"
                 "1️⃣ <b>𝐔ᴘʟᴏᴀᴅ 𝐂ᴏᴠᴇʀ:</b> 𝐒ᴇɴᴅ ᴀɴʏ ᴘʜᴏᴛᴏ ᴛᴏ sᴇᴛ ᴀs ᴛʜᴜᴍʙɴᴀɪʟ.\n"
                 "2️⃣ <b>𝐂ᴀᴘᴛɪᴏɴ 𝐅ᴏɴᴛ:</b> 𝐏ɪᴄᴋ ᴀ sᴛʏʟɪsʜ ꜰᴏɴᴛ ꜰʀᴏᴍ /fonts.\n"
-                "3️⃣ <b>𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ:</b> 𝐋ɪɴᴋ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ ᴠɪᴀ /channel.\n"
-                "4️⃣ <b>𝐀ᴘᴘʟʏ:</b> 𝐒ᴇɴᴅ ᴀɴʏ ᴠɪᴅᴇᴏ — ᴛʜᴜᴍʙɴᴀɪʟ & ꜰᴏɴᴛ ᴀᴘᴘʟʏ ɪɴsᴛᴀɴᴛʟʏ!\n\n"
+                "3️⃣ <b>𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ:</b> 𝐒ᴇᴛᴛɪɴɢs → 𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ (use {filename}).\n"
+                "4️⃣ <b>𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ:</b> 𝐋ɪɴᴋ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ ᴠɪᴀ /channel.\n"
+                "5️⃣ <b>𝐀ᴘᴘʟʏ:</b> 𝐒ᴇɴᴅ ᴀɴʏ ᴠɪᴅᴇᴏ — ᴛʜᴜᴍʙɴᴀɪʟ & ᴄᴀᴘᴛɪᴏɴ ᴀᴘᴘʟʏ ɪɴsᴛᴀɴᴛʟʏ!\n\n"
                 "📢 <b>𝐔ᴘᴅᴀᴛᴇs 𝐂ʜᴀɴɴᴇʟ:</b> @MoviesGroupG3\n"
                 "👤 <b>𝐎ᴡɴᴇʀ:</b> @movies_1780\n"
                 "💬 <b>𝐒ᴜᴘᴘᴏʀᴛ & 𝐃ᴏᴜʙᴛs:</b> @movies_1780"
@@ -67,6 +69,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
                 "✨ <b>𝐅ᴀsᴛᴇsᴛ 𝐕ɪᴅᴇᴏ 𝐂ᴏᴠᴇʀ & 𝐂ᴀᴘᴛɪᴏɴ 𝐒ᴛʏʟᴇʀ 𝐁ᴏᴛ</b>\n"
                 "• 𝐒ᴜᴘᴘᴏʀᴛs ʜɪɢʜ sᴘᴇᴇᴅ ᴠɪᴅᴇᴏ ᴘʀᴏᴄᴇssɪɴɢ\n"
                 "• 𝟏𝟑+ 𝐂ᴀᴘᴛɪᴏɴ 𝐔ɴɪᴄᴏᴅᴇ 𝐅ᴏɴᴛ 𝐒ᴛʏʟᴇs\n"
+                "• 𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ 𝐓ᴇᴍᴘʟᴀᴛᴇ ({filename})\n"
                 "• 𝐀ᴜᴛᴏᴍᴀᴛᴇᴅ 𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ 𝐅ᴏʀᴡᴀʀᴅɪɴɢ\n\n"
                 "📢 <b>𝐔ᴘᴅᴀᴛᴇs 𝐂ʜᴀɴɴᴇʟ:</b> @MoviesGroupG3\n"
                 "👤 <b>𝐎ᴡɴᴇʀ:</b> @movies_1780\n"
@@ -114,6 +117,56 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         else:
             await query.answer()
         text, kb = get_fonts_menu(uid)
+        try:
+            if getattr(query.message, "photo", None):
+                await query.message.edit_caption(text, reply_markup=kb, parse_mode="HTML")
+            else:
+                await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+        except Exception:
+            pass
+        return
+
+    if data == "submenu_caption":
+        await query.answer()
+        text, kb = get_caption_menu(uid)
+        try:
+            if getattr(query.message, "photo", None):
+                await query.message.edit_caption(text, reply_markup=kb, parse_mode="HTML")
+            else:
+                await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+        except Exception:
+            pass
+        return
+
+    if data == "cap_set_prompt":
+        await query.answer()
+        context.user_data["waiting_for"] = "custom_caption"
+        text = (
+            "📝 <b>𝐒ᴇᴛ 𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ 𝐓ᴇᴍᴘʟᴀᴛᴇ</b>\n\n"
+            "𝐀ᴘɴᴀ ᴄᴀᴘᴛɪᴏɴ ᴛᴇᴍᴘʟᴀᴛᴇ ʟɪᴋʜ ᴋᴀʀ ʙʜᴇᴊᴏ.\n\n"
+            "<b>📌 𝐏𝐥𝐚𝐜𝐞𝐡𝐨𝐥𝐝𝐞𝐫𝐬:</b>\n"
+            "• <code>{filename}</code> → 𝐕ɪᴅᴇᴏ ꜰɪʟᴇ ɴᴀᴍᴇ\n"
+            "• <code>{original}</code> → 𝐎ʀɪɢɪɴᴀʟ ᴄᴀᴘᴛɪᴏɴ\n\n"
+            "<b>📌 𝐄xᴀᴍᴘʟᴇ:</b>\n"
+            "<code>{filename}\n\n📢 @MoviesGroupG3</code>\n\n"
+            "𝐘ᴀ:\n"
+            "<code>🎬 {filename}\n{original}\n\n🔗 Join @MoviesGroupG3</code>\n\n"
+            "👇 <i>𝐀ʙʜɪ ᴛᴇᴍᴘʟᴀᴛᴇ ʙʜᴇᴊᴏ (ʏᴀ /cancel):</i>"
+        )
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton("❌ 𝐂ᴀɴᴄᴇʟ", callback_data="submenu_caption")]])
+        try:
+            if getattr(query.message, "photo", None):
+                await query.message.edit_caption(text, reply_markup=kb, parse_mode="HTML")
+            else:
+                await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+        except Exception:
+            pass
+        return
+
+    if data == "cap_delete":
+        delete_custom_caption(uid)
+        await query.answer("🗑️ Auto Caption removed!", show_alert=False)
+        text, kb = get_caption_menu(uid)
         try:
             if getattr(query.message, "photo", None):
                 await query.message.edit_caption(text, reply_markup=kb, parse_mode="HTML")

@@ -11,12 +11,13 @@ from database import (
     save_thumbnail, get_thumbnail, delete_thumbnail, has_thumbnail,
     save_destination_channel, get_destination_channel,
     get_font_style, get_send_mode,
+    get_custom_caption, save_custom_caption, delete_custom_caption,
     log_thumbnail_set, log_thumbnail_removed, format_log_message
 )
 from font import format_caption, get_font_name
 from helpers.menus import (
     get_home_menu_text, get_home_menu_markup,
-    get_settings_menu, get_fonts_menu, get_channel_menu
+    get_settings_menu, get_fonts_menu, get_channel_menu, get_caption_menu
 )
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,17 @@ def bold_entities(text: str):
     if not text:
         return []
     return [MessageEntity(type=MessageEntity.BOLD, offset=0, length=len(text))]
+
+
+def apply_caption_template(template: str, filename: str = "", original: str = "") -> str:
+    """Replace placeholders in custom caption template."""
+    if not template:
+        return original or ""
+    result = template.replace("{filename}", filename or "")
+    result = result.replace("{original}", original or "")
+    result = result.replace("{caption}", original or "")
+    result = result.replace("{name}", filename or "")
+    return result.strip()
 
 
 async def send_log(context: ContextTypes.DEFAULT_TYPE, message: str):
@@ -58,12 +70,15 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "   • 𝐒ᴇɴᴅ ᴀɴʏ ᴘʜᴏᴛᴏ ᴛᴏ sᴀᴠᴇ ɪᴛ ᴀs ʏᴏᴜʀ ᴠɪᴅᴇᴏ ᴄᴏᴠᴇʀ.\n\n"
         "<b>2️⃣ 𝐂ʜᴏᴏsᴇ 𝐘ᴏᴜʀ 𝐂ᴀᴘᴛɪᴏɴ 𝐅ᴏɴᴛ</b>\n"
         "   • 𝐆ᴏ ᴛᴏ /fonts ᴛᴏ sᴇʟᴇᴄᴛ ꜰʀᴏᴍ 𝟏𝟑+ sᴛʏʟɪsʜ ꜰᴏɴᴛs.\n\n"
-        "<b>3️⃣ 𝐒ᴇᴛ 𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ (𝐎ᴘᴛɪᴏɴᴀʟ)</b>\n"
+        "<b>3️⃣ 𝐒ᴇᴛ 𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ (𝐎ᴘᴛɪᴏɴᴀʟ)</b>\n"
+        "   • 𝐒ᴇᴛᴛɪɴɢs → 𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ → ᴀᴘɴᴀ ᴛᴇᴍᴘʟᴀᴛᴇ sᴀᴠᴇ ᴋᴀʀᴏ.\n"
+        "   • 𝐔sᴇ: <code>{filename}</code> ᴀᴜʀ <code>{original}</code>\n\n"
+        "<b>4️⃣ 𝐒ᴇᴛ 𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ (𝐎ᴘᴛɪᴏɴᴀʟ)</b>\n"
         "   • 𝐆ᴏ ᴛᴏ /channel ᴛᴏ ʟɪɴᴋ ʏᴏᴜʀ 𝐓ᴇʟᴇɢʀᴀᴍ ᴄʜᴀɴɴᴇʟ.\n"
         "   • 𝐀ᴅᴅ ᴛʜɪs ʙᴏᴛ ᴀs ᴀɴ 𝐀ᴅᴍɪɴ ɪɴ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ.\n\n"
-        "<b>4️⃣ 𝐒ᴇɴᴅ 𝐘ᴏᴜʀ 𝐕ɪᴅᴇᴏs</b>\n"
+        "<b>5️⃣ 𝐒ᴇɴᴅ 𝐘ᴏᴜʀ 𝐕ɪᴅᴇᴏs</b>\n"
         "   • 𝐒ᴇɴᴅ ᴀɴʏ ᴠɪᴅᴇᴏ ꜰɪʟᴇ.\n"
-        "   • 𝐓ʜᴜᴍʙɴᴀɪʟ ᴀɴᴅ ꜰᴏɴᴛ ᴀʀᴇ ᴀᴘᴘʟɪᴇᴅ ɪɴsᴛᴀɴᴛʟʏ ᴀɴᴅ ᴀᴜᴛᴏ-sᴇɴᴛ ᴛᴏ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ!\n\n"
+        "   • 𝐓ʜᴜᴍʙɴᴀɪʟ, ᴀᴜᴛᴏ ᴄᴀᴘᴛɪᴏɴ & ꜰᴏɴᴛ ᴀᴘᴘʟʏ ɪɴsᴛᴀɴᴛʟʏ!\n\n"
         "<b>💡 𝐂ᴏᴍᴍᴀɴᴅs:</b>\n"
         "/start – 𝐌ᴀɪɴ 𝐌ᴇɴᴜ\n"
         "/settings – 𝐂ᴏɴꜰɪɢᴜʀᴇ 𝐒ᴇᴛᴛɪɴɢs\n"
@@ -89,6 +104,7 @@ async def about_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✨ <b>𝐅ᴇᴀᴛᴜʀᴇs:</b>\n"
         "✅ 𝐈ɴsᴛᴀɴᴛ 𝐓ʜᴜᴍʙɴᴀɪʟ 𝐑ᴇᴘʟᴀᴄᴇᴍᴇɴᴛ\n"
         "✅ 𝟏𝟑+ 𝐂ᴀᴘᴛɪᴏɴ 𝐅ᴏɴᴛ 𝐒ᴛʏʟᴇs\n"
+        "✅ 𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ 𝐓ᴇᴍᴘʟᴀᴛᴇ ({filename})\n"
         "✅ 𝐀ᴜᴛᴏ-sᴇɴᴅ ᴛᴏ 𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ\n"
         "✅ 𝐇ɪɢʜ 𝐒ᴘᴇᴇᴅ 𝐂ʟᴏᴜᴅ 𝐏ʀᴏᴄᴇssɪɴɢ\n\n"
         "📢 <b>𝐎ꜰꜰɪᴄɪᴀʟ 𝐔ᴘᴅᴀᴛᴇs:</b> @MoviesGroupG3\n"
@@ -152,15 +168,30 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not cover:
         return await update.message.reply_text("❌ <b>𝐍ᴏ 𝐓ʜᴜᴍʙɴᴀɪʟ 𝐅ᴏᴜɴᴅ!</b>\n𝐏ʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴘʜᴏᴛᴏ ꜰɪʀsᴛ ᴛᴏ sᴀᴠᴇ ᴀs ʏᴏᴜʀ ᴄᴏᴠᴇʀ.", parse_mode="HTML")
     status_msg = await update.message.reply_text("⏳ <b>𝐏ʀᴏᴄᴇssɪɴɢ 𝐕ɪᴅᴇᴏ...</b>\n𝐏ʟᴇᴀsᴇ ᴡᴀɪᴛ ᴀ ᴍᴏᴍᴇɴᴛ.", parse_mode="HTML")
+
+    filename = ""
     if update.message.video:
         video_id = update.message.video.file_id
+        filename = getattr(update.message.video, "file_name", None) or ""
     elif update.message.document:
         video_id = update.message.document.file_id
+        filename = getattr(update.message.document, "file_name", None) or ""
     else:
         return
+
+    if not filename:
+        filename = "Video"
+
     font_style = get_font_style(user_id)
     original_caption = update.message.caption or ""
-    new_caption = format_caption(original_caption, font_style) if original_caption else ""
+    custom_template = get_custom_caption(user_id)
+
+    if custom_template:
+        raw_caption = apply_caption_template(custom_template, filename=filename, original=original_caption)
+    else:
+        raw_caption = original_caption
+
+    new_caption = format_caption(raw_caption, font_style) if raw_caption else ""
     caption_entities = bold_entities(new_caption) if font_style == "bold" and new_caption else None
     dest_chan = get_destination_channel(user_id)
     send_mode = get_send_mode(user_id)
@@ -197,7 +228,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"🎥 <b>Video Processed</b>\n"
                     f"👤 User: <code>{user_id}</code> (@{username})\n"
                     f"✍️ Font: <code>{get_font_name(font_style)}</code>\n"
-                    f"📝 Caption: {original_caption or 'No Caption'}"
+                    f"📝 Caption: {new_caption[:80] if new_caption else 'No Caption'}"
                 )
                 await context.bot.send_video(chat_id=LOG_CHANNEL_ID, video=video_id, caption=log_caption, supports_streaming=True, thumbnail=cover, parse_mode="HTML")
             except Exception:
@@ -211,6 +242,31 @@ async def text_and_channel_handler(update: Update, context: ContextTypes.DEFAULT
     user_id = update.effective_user.id
     waiting_for = context.user_data.get("waiting_for")
     fwd_chat = getattr(update.message, "forward_from_chat", None)
+
+    # --- Auto Caption template input ---
+    if waiting_for == "custom_caption":
+        if not update.message.text:
+            return
+        raw = update.message.text.strip()
+        if raw.lower() in ("/cancel", "cancel"):
+            context.user_data.pop("waiting_for", None)
+            return await update.message.reply_text("❌ <b>𝐂ᴀᴘᴛɪᴏɴ sᴇᴛᴜᴘ ᴄᴀɴᴄᴇʟʟᴇᴅ.</b>", parse_mode="HTML")
+        save_custom_caption(user_id, raw)
+        context.user_data.pop("waiting_for", None)
+        text = (
+            "✅ <b>𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ 𝐓ᴇᴍᴘʟᴀᴛᴇ 𝐒ᴀᴠᴇᴅ!</b>\n\n"
+            f"<blockquote>{raw[:300]}</blockquote>\n\n"
+            "📌 <code>{filename}</code> → 𝐕ɪᴅᴇᴏ ɴᴀᴍᴇ\n"
+            "📌 <code>{original}</code> → 𝐎ʀɪɢɪɴᴀʟ ᴄᴀᴘᴛɪᴏɴ\n\n"
+            "🚀 𝐀ʙ sᴇ ʜᴀʀ ᴠɪᴅᴇᴏ ᴘᴇ ʏᴇ ᴄᴀᴘᴛɪᴏɴ ᴀᴜᴛᴏ ʟᴀɢᴇɢᴀ + ʏᴏᴜʀ ꜰᴏɴᴛ."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📝 𝐕ɪᴇᴡ / 𝐄ᴅɪᴛ", callback_data="submenu_caption")],
+            [InlineKeyboardButton("⚙️ 𝐒ᴇᴛᴛɪɴɢs", callback_data="menu_settings")]
+        ])
+        return await update.message.reply_text(text, reply_markup=kb, parse_mode="HTML")
+
+    # --- Destination channel linking ---
     if waiting_for == "destination_channel" or (fwd_chat and fwd_chat.type == "channel"):
         channel_input = None
         if fwd_chat and fwd_chat.type == "channel":
