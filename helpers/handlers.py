@@ -45,10 +45,10 @@ def looks_like_html(text: str) -> bool:
 def sanitize_telegram_html(text: str) -> str:
     """
     Clean HTML so Telegram can parse it reliably.
-    Handles the common movie-channel templates that have:
+    Handles common movie-channel templates that have:
     - <b><blockquote>...</blockquote></b>  (invalid nesting)
     - newlines inside tags
-    - unclosed / mismatched tags
+    - unclosed / mismatched / orphan tags
     - extra spaces inside <a> tags
     """
     if not text:
@@ -100,26 +100,36 @@ def sanitize_telegram_html(text: str) -> str:
         flags=re.I
     )
 
-    # 7. Fix double-nested or broken <a> closings that appear in clipboard pastes
+    # 7. Fix double-nested or broken <a> closings
     text = re.sub(r"</a>\s*</a>", "</a>", text, flags=re.I)
 
-    # 8. Make sure every <blockquote> has a matching closer (basic balance)
-    open_bq = len(re.findall(r"<blockquote\b", text, re.I))
-    close_bq = len(re.findall(r"</blockquote>", text, re.I))
-    if open_bq > close_bq:
-        text += "</blockquote>" * (open_bq - close_bq)
+    # 8. Remove orphan closing tags (closing without matching open) — safer than adding
+    def remove_orphan_closers(src: str, tag: str) -> str:
+        result = []
+        balance = 0
+        pos = 0
+        for m in re.finditer(rf"(<{tag}\b[^>]*>|</{tag}>)", src, re.I):
+            result.append(src[pos:m.start()])
+            tok = m.group(0)
+            if tok.lower().startswith("</"):
+                if balance > 0:
+                    result.append(tok)
+                    balance -= 1
+                # else: orphan closer → skip
+            else:
+                result.append(tok)
+                balance += 1
+            pos = m.end()
+        result.append(src[pos:])
+        # Close any remaining open tags
+        result.append(f"</{tag}>" * balance)
+        return "".join(result)
 
-    # 9. Same for <a> tags (very common failure)
-    open_a = len(re.findall(r"<a\s", text, re.I))
-    close_a = len(re.findall(r"</a>", text, re.I))
-    if open_a > close_a:
-        text += "</a>" * (open_a - close_a)
+    for tag in ("a", "b", "i", "u", "s", "strong", "em", "blockquote", "code", "pre"):
+        text = remove_orphan_closers(text, tag)
 
-    # 10. Same for <b>
-    open_b = len(re.findall(r"<b\b", text, re.I))
-    close_b = len(re.findall(r"</b>", text, re.I))
-    if open_b > close_b:
-        text += "</b>" * (open_b - close_b)
+    # 9. Final cleanup of consecutive empty lines
+    text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()
 
@@ -327,7 +337,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     async def try_send_channel(caption_text, as_html):
         dest_chat_id = dest_chan["channel_id"]
         kwargs = {
-            "chat_id": dest_chat_id,
+            "chat_id": dest_chan["channel_id"],
             "video": video_id,
             "caption": caption_text or None,
             "supports_streaming": True,
@@ -349,7 +359,6 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as parse_err:
                 err_str = str(parse_err).lower()
                 if parse_mode_html and ("parse" in err_str or "entities" in err_str or "tag" in err_str):
-                    # HTML failed → try one more aggressive clean then plain fallback
                     logger.warning(f"HTML caption failed, trying extra clean: {parse_err}")
                     cleaned2 = sanitize_telegram_html(raw_caption)
                     try:
