@@ -22,29 +22,44 @@ from helpers.menus import (
 logger = logging.getLogger(__name__)
 
 
+async def _safe_edit(query, text, kb):
+    """Edit message safely; if edit fails, send a new message."""
+    try:
+        if getattr(query.message, "photo", None):
+            await query.message.edit_caption(caption=text, reply_markup=kb, parse_mode="HTML")
+        else:
+            await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+        return True
+    except Exception as e:
+        logger.debug(f"Edit failed, sending new message: {e}")
+        try:
+            await query.message.reply_text(text, reply_markup=kb, parse_mode="HTML")
+            return True
+        except Exception as e2:
+            logger.error(f"Reply also failed: {e2}")
+            return False
+
+
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Main callback query router"""
     query = update.callback_query
-    data = query.data
+    data = query.data or ""
     uid = query.from_user.id
-    
-    if data in ("menu_back", "menu_home"):
+
+    try:
         await query.answer()
+    except Exception:
+        pass
+
+    if data in ("menu_back", "menu_home"):
         text = get_home_menu_text()
         kb = get_home_menu_markup(uid)
-        try:
-            if getattr(query.message, "photo", None):
-                await query.message.edit_caption(text, reply_markup=kb, parse_mode="HTML")
-            else:
-                await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
-        except Exception:
-            pass
+        await _safe_edit(query, text, kb)
         return
 
     if data.startswith("menu_"):
-        await query.answer()
         key = data.replace("menu_", "")
-        
+
         if key == "help":
             text = (
                 "📖 <b>𝐂ᴏᴍᴘʟᴇᴛᴇ 𝐆ᴜɪᴅᴇ & 𝐅ᴇᴀᴛᴜʀᴇs</b>\n\n"
@@ -100,96 +115,61 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         else:
             return
 
-        try:
-            if getattr(query.message, "photo", None):
-                await query.message.edit_caption(text, reply_markup=kb, parse_mode="HTML")
-            else:
-                await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
-        except Exception:
-            pass
+        await _safe_edit(query, text, kb)
         return
 
     if data == "submenu_fonts" or data.startswith("set_font_"):
         if data.startswith("set_font_"):
             chosen_font = data.replace("set_font_", "")
             save_font_style(uid, chosen_font)
-            await query.answer(f"✅ Font set to {get_font_name(chosen_font)}", show_alert=False)
-        else:
-            await query.answer()
+            try:
+                await query.answer(f"✅ Font set to {get_font_name(chosen_font)}", show_alert=False)
+            except Exception:
+                pass
         text, kb = get_fonts_menu(uid)
-        try:
-            if getattr(query.message, "photo", None):
-                await query.message.edit_caption(text, reply_markup=kb, parse_mode="HTML")
-            else:
-                await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
-        except Exception:
-            pass
+        await _safe_edit(query, text, kb)
         return
 
+    # --- Auto Caption ---
     if data == "submenu_caption":
-        await query.answer()
         text, kb = get_caption_menu(uid)
-        try:
-            if getattr(query.message, "photo", None):
-                await query.message.edit_caption(text, reply_markup=kb, parse_mode="HTML")
-            else:
-                await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
-        except Exception:
-            pass
+        await _safe_edit(query, text, kb)
         return
 
     if data == "cap_set_prompt":
-        await query.answer()
         context.user_data["waiting_for"] = "custom_caption"
         text = (
             "📝 <b>𝐒ᴇᴛ 𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ 𝐓ᴇᴍᴘʟᴀᴛᴇ</b>\n\n"
             "𝐀ᴘɴᴀ ᴄᴀᴘᴛɪᴏɴ ᴛᴇᴍᴘʟᴀᴛᴇ ʟɪᴋʜ ᴋᴀʀ ʙʜᴇᴊᴏ.\n\n"
-            "<b>📌 𝐏𝐥𝐚𝐜𝐞𝐡𝐨𝐥𝐝𝐞𝐫𝐬:</b>\n"
-            "• <code>{filename}</code> → 𝐕ɪᴅᴇᴏ ꜰɪʟᴇ ɴᴀᴍᴇ\n"
-            "• <code>{original}</code> → 𝐎ʀɪɢɪɴᴀʟ ᴄᴀᴘᴛɪᴏɴ\n\n"
-            "<b>📌 𝐄xᴀᴍᴘʟᴇ:</b>\n"
+            "<b>📌 Placeholders:</b>\n"
+            "• <code>{filename}</code> → Video file name\n"
+            "• <code>{original}</code> → Original caption\n\n"
+            "<b>📌 Example:</b>\n"
             "<code>{filename}\n\n📢 @MoviesGroupG3</code>\n\n"
-            "𝐘ᴀ:\n"
+            "Ya:\n"
             "<code>🎬 {filename}\n{original}\n\n🔗 Join @MoviesGroupG3</code>\n\n"
-            "👇 <i>𝐀ʙʜɪ ᴛᴇᴍᴘʟᴀᴛᴇ ʙʜᴇᴊᴏ (ʏᴀ /cancel):</i>"
+            "👇 <i>Abhi template bhejo (ya /cancel):</i>"
         )
-        kb = InlineKeyboardMarkup([[InlineKeyboardButton("❌ 𝐂ᴀɴᴄᴇʟ", callback_data="submenu_caption")]])
-        try:
-            if getattr(query.message, "photo", None):
-                await query.message.edit_caption(text, reply_markup=kb, parse_mode="HTML")
-            else:
-                await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
-        except Exception:
-            pass
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="submenu_caption")]])
+        await _safe_edit(query, text, kb)
         return
 
     if data == "cap_delete":
         delete_custom_caption(uid)
-        await query.answer("🗑️ Auto Caption removed!", show_alert=False)
-        text, kb = get_caption_menu(uid)
         try:
-            if getattr(query.message, "photo", None):
-                await query.message.edit_caption(text, reply_markup=kb, parse_mode="HTML")
-            else:
-                await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+            await query.answer("🗑️ Auto Caption removed!", show_alert=False)
         except Exception:
             pass
+        text, kb = get_caption_menu(uid)
+        await _safe_edit(query, text, kb)
         return
 
     if data == "submenu_channel":
-        await query.answer()
         text, kb = get_channel_menu(uid)
-        try:
-            if getattr(query.message, "photo", None):
-                await query.message.edit_caption(text, reply_markup=kb, parse_mode="HTML")
-            else:
-                await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
-        except Exception:
-            pass
+        await _safe_edit(query, text, kb)
         return
 
     if data == "chan_set_prompt":
-        await query.answer()
         context.user_data["waiting_for"] = "destination_channel"
         text = (
             "📢 <b>𝐂ᴏɴɴᴇᴄᴛ 𝐘ᴏᴜʀ 𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ</b>\n\n"
@@ -198,13 +178,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             "👇 <i>𝐒ᴇɴᴅ ᴄʜᴀɴɴᴇʟ ᴅᴇᴛᴀɪʟs ɴᴏᴡ:</i>"
         )
         kb = InlineKeyboardMarkup([[InlineKeyboardButton("❌ 𝐂ᴀɴᴄᴇʟ", callback_data="submenu_channel")]])
-        try:
-            if getattr(query.message, "photo", None):
-                await query.message.edit_caption(text, reply_markup=kb, parse_mode="HTML")
-            else:
-                await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
-        except Exception:
-            pass
+        await _safe_edit(query, text, kb)
         return
 
     if data == "chan_toggle_mode":
@@ -212,21 +186,21 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         next_mode = "channel_only" if current == "both" else ("user_only" if current == "channel_only" else "both")
         save_send_mode(uid, next_mode)
         mode_label = "📤 𝐁ᴏᴛʜ" if next_mode == "both" else ("📢 𝐂ʜᴀɴɴᴇʟ 𝐎ɴʟʏ" if next_mode == "channel_only" else "👤 𝐂ʜᴀᴛ 𝐎ɴʟʏ")
-        await query.answer(f"✅ Mode: {mode_label}", show_alert=False)
-        text, kb = get_channel_menu(uid)
         try:
-            if getattr(query.message, "photo", None):
-                await query.message.edit_caption(text, reply_markup=kb, parse_mode="HTML")
-            else:
-                await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+            await query.answer(f"✅ Mode: {mode_label}", show_alert=False)
         except Exception:
             pass
+        text, kb = get_channel_menu(uid)
+        await _safe_edit(query, text, kb)
         return
 
     if data == "chan_test":
         dest_chan = get_destination_channel(uid)
         if not dest_chan:
-            await query.answer("❌ No channel connected!", show_alert=True)
+            try:
+                await query.answer("❌ No channel connected!", show_alert=True)
+            except Exception:
+                pass
             return
         chan_id = dest_chan.get("channel_id")
         try:
@@ -241,24 +215,23 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             )
             await query.answer("✅ Test post successful! Check your channel.", show_alert=True)
         except Exception as e:
-            await query.answer(f"❌ Failed: {str(e)[:100]}\nMake sure bot is Admin with 'Post Messages' permission!", show_alert=True)
+            try:
+                await query.answer(f"❌ Failed: {str(e)[:80]}\nBot must be Admin with Post Messages!", show_alert=True)
+            except Exception:
+                pass
         return
 
     if data == "chan_delete":
         delete_destination_channel(uid)
-        await query.answer("🗑️ Channel removed!", show_alert=False)
-        text, kb = get_channel_menu(uid)
         try:
-            if getattr(query.message, "photo", None):
-                await query.message.edit_caption(text, reply_markup=kb, parse_mode="HTML")
-            else:
-                await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+            await query.answer("🗑️ Channel removed!", show_alert=False)
         except Exception:
             pass
+        text, kb = get_channel_menu(uid)
+        await _safe_edit(query, text, kb)
         return
 
     if data == "submenu_thumbnails":
-        await query.answer()
         thumb = get_thumbnail(uid)
         if thumb:
             text = "🖼️ <b>𝐘ᴏᴜʀ 𝐒ᴀᴠᴇᴅ 𝐓ʜᴜᴍʙɴᴀɪʟ</b>\n\n✅ <b>𝐀ᴄᴛɪᴠᴇ ᴀɴᴅ ʀᴇᴀᴅʏ ᴛᴏ ᴀᴘᴘʟʏ.</b>"
@@ -269,37 +242,30 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             try:
                 await query.message.reply_photo(photo=thumb, caption=text, reply_markup=kb, parse_mode="HTML")
             except Exception:
-                await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+                await _safe_edit(query, text, kb)
         else:
             text = "🖼️ <b>𝐍ᴏ 𝐓ʜᴜᴍʙɴᴀɪʟ 𝐒ᴀᴠᴇᴅ</b>\n\n𝐒ᴇɴᴅ ᴀɴʏ ᴘʜᴏᴛᴏ ᴛᴏ ᴛʜɪs ᴄʜᴀᴛ ᴛᴏ sᴀᴠᴇ ɪᴛ ᴀs ʏᴏᴜʀ ᴠɪᴅᴇᴏ ᴛʜᴜᴍʙɴᴀɪʟ."
             kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ 𝐁ᴀᴄᴋ 𝐓ᴏ 𝐒ᴇᴛᴛɪɴɢs", callback_data="menu_settings")]])
-            try:
-                if getattr(query.message, "photo", None):
-                    await query.message.edit_caption(text, reply_markup=kb, parse_mode="HTML")
-                else:
-                    await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
-            except Exception:
-                pass
+            await _safe_edit(query, text, kb)
         return
 
     if data == "thumb_delete":
         delete_thumbnail(uid)
-        await query.answer("🗑️ Thumbnail deleted!", show_alert=False)
-        text, kb = get_settings_menu(uid)
         try:
-            if getattr(query.message, "photo", None):
-                await query.message.edit_caption(text, reply_markup=kb, parse_mode="HTML")
-            else:
-                await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+            await query.answer("🗑️ Thumbnail deleted!", show_alert=False)
         except Exception:
             pass
+        text, kb = get_settings_menu(uid)
+        await _safe_edit(query, text, kb)
         return
 
     if data.startswith("admin_"):
         if not is_admin(uid):
-            await query.answer("❌ Unauthorized", show_alert=True)
+            try:
+                await query.answer("❌ Unauthorized", show_alert=True)
+            except Exception:
+                pass
             return
-        await query.answer()
         if data == "admin_stats":
             total = get_total_users()
             banned = get_banned_users_count()
@@ -311,7 +277,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
                 f"🚫 <b>𝐁ᴀɴɴᴇᴅ:</b> <code>{banned}</code>"
             )
             kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ 𝐁ᴀᴄᴋ", callback_data="admin_back")]])
-            await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+            await _safe_edit(query, text, kb)
         elif data == "admin_back":
             total = get_total_users()
             banned = get_banned_users_count()
@@ -323,5 +289,5 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
                 [InlineKeyboardButton("📊 𝐒ᴛᴀᴛs", callback_data="admin_stats")],
                 [InlineKeyboardButton("⬅️ 𝐂ʟᴏsᴇ 𝐏ᴀɴᴇʟ", callback_data="menu_back")]
             ])
-            await query.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+            await _safe_edit(query, text, kb)
         return

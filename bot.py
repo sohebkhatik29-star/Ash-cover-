@@ -57,7 +57,12 @@ def start_health_server():
 
 
 def wrap_sub(handler_fn):
+    """Force-sub check, but allow mid-setup flows (caption/channel input)."""
     async def wrapper(update, context):
+        waiting = context.user_data.get("waiting_for")
+        # Allow caption/channel setup text even if force-sub fails momentarily
+        if waiting in ("custom_caption", "destination_channel"):
+            return await handler_fn(update, context)
         if not await check_force_sub(update, context):
             return
         return await handler_fn(update, context)
