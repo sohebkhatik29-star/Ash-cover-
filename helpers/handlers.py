@@ -36,7 +36,7 @@ def looks_like_html(text: str) -> bool:
     if not text:
         return False
     return bool(re.search(
-        r"<(a|b|i|u|s|code|pre|blockquote|tg-spoiler|tg-emoji|strong|em)\b|/?(a|b|i|u|s|code|pre|blockquote|strong|em)>" ,
+        r"<(a|b|i|u|s|code|pre|blockquote|tg-spoiler|tg-emoji|strong|em)\b|/?(a|b|i|u|s|code|pre|blockquote|strong|em)>",
         text,
         re.I
     ))
@@ -44,58 +44,90 @@ def looks_like_html(text: str) -> bool:
 
 def sanitize_telegram_html(text: str) -> str:
     """
-    Clean HTML so Telegram can parse it.
-    - Fix broken tags split across newlines
-    - Remove invalid nesting of <b> around <blockquote>
-    - Ensure common tags are properly closed
+    Clean HTML so Telegram can parse it reliably.
+    Handles the common movie-channel templates that have:
+    - <b><blockquote>...</blockquote></b>  (invalid nesting)
+    - newlines inside tags
+    - unclosed / mismatched tags
+    - extra spaces inside <a> tags
     """
     if not text:
         return text
 
-    # Fix tags broken by newlines: </\nb>  -> </b>
-    text = re.sub(r"</\s*\n\s*([a-zA-Z]+)>" , r"</\1>", text)
-    text = re.sub(r"<\s*\n\s*([a-zA-Z]+)" , r"<\1", text)
+    # 1. Normalize newlines / whitespace inside tags
+    text = re.sub(r"</\s*\n\s*([a-zA-Z0-9]+)\s*>", r"</\1>", text)
+    text = re.sub(r"<\s*\n\s*([a-zA-Z0-9]+)", r"<\1", text)
+    text = re.sub(r"\n\s*(</?(?:a|b|i|u|s|code|pre|blockquote|strong|em)[^>]*>)", r"\1", text)
+    text = re.sub(r"(</?(?:a|b|i|u|s|code|pre|blockquote|strong|em)[^>]*>)\s*\n", r"\1", text)
 
-    # Collapse whitespace inside tags
-    text = re.sub(r"<(a|b|i|u|s|code|pre|blockquote|strong|em)(\s[^>]*)?>\s*" , lambda m: m.group(0).rstrip() + ("" if m.group(0).endswith(">") else ""), text)
-
-    # Telegram does not like <b><blockquote>...</blockquote></b>
-    # Convert to <blockquote><b>...</b></blockquote> or just blockquote
+    # 2. Fix <a href=...> without quotes
     text = re.sub(
-        r"<b>\s*<blockquote>(.*?)</blockquote>\s*</b>",
-        r"<blockquote>\1</blockquote>",
-        text,
-        flags=re.I | re.S
-    )
-    text = re.sub(
-        r"<strong>\s*<blockquote>(.*?)</blockquote>\s*</strong>",
-        r"<blockquote>\1</blockquote>",
-        text,
-        flags=re.I | re.S
-    )
-
-    # Fix double-nested b around blockquote left as: </blockquote></b><b><blockquote>
-    text = re.sub(r"</blockquote>\s*</b>\s*<b>\s*<blockquote>", "</blockquote>\n<blockquote>", text, flags=re.I)
-
-    # Remove empty tags
-    text = re.sub(r"<(b|i|u|s|strong|em)>\s*</\1>", "", text, flags=re.I)
-
-    # Ensure <a href="..."> has quotes
-    text = re.sub(
-        r'<a\s+href=([^"\s>]+)(\s|>)',
+        r'<a\s+href=([^"\'\s>]+)(\s|>)',
         r'<a href="\1"\2',
         text,
         flags=re.I
     )
 
+    # 3. Remove outer <b> / <strong> around <blockquote> (Telegram forbids this)
+    #    <b><blockquote>xxx</blockquote></b>  →  <blockquote>xxx</blockquote>
+    text = re.sub(
+        r"<(?:b|strong)>\s*<blockquote>(.*?)</blockquote>\s*</(?:b|strong)>",
+        r"<blockquote>\1</blockquote>",
+        text,
+        flags=re.I | re.S
+    )
+
+    # 4. Fix leftover broken patterns like:
+    #    </blockquote></b><b><blockquote>  or  </blockquote></b>
+    text = re.sub(r"</blockquote>\s*</(?:b|strong)>\s*<(?:b|strong)>\s*<blockquote>", "</blockquote>\n<blockquote>", text, flags=re.I)
+    text = re.sub(r"</blockquote>\s*</(?:b|strong)>", "</blockquote>", text, flags=re.I)
+    text = re.sub(r"<(?:b|strong)>\s*<blockquote>", "<blockquote>", text, flags=re.I)
+
+    # 5. Clean empty bold/italic tags
+    text = re.sub(r"<(b|i|u|s|strong|em)>\s*</\1>", "", text, flags=re.I)
+
+    # 6. Ensure <a> content is clean (remove leading/trailing spaces inside)
+    text = re.sub(
+        r'(<a\s+href="[^"]*">)\s+',
+        r'\1',
+        text,
+        flags=re.I
+    )
+    text = re.sub(
+        r'\s+(</a>)',
+        r'\1',
+        text,
+        flags=re.I
+    )
+
+    # 7. Fix double-nested or broken <a> closings that appear in clipboard pastes
+    text = re.sub(r"</a>\s*</a>", "</a>", text, flags=re.I)
+
+    # 8. Make sure every <blockquote> has a matching closer (basic balance)
+    open_bq = len(re.findall(r"<blockquote\b", text, re.I))
+    close_bq = len(re.findall(r"</blockquote>", text, re.I))
+    if open_bq > close_bq:
+        text += "</blockquote>" * (open_bq - close_bq)
+
+    # 9. Same for <a> tags (very common failure)
+    open_a = len(re.findall(r"<a\s", text, re.I))
+    close_a = len(re.findall(r"</a>", text, re.I))
+    if open_a > close_a:
+        text += "</a>" * (open_a - close_a)
+
+    # 10. Same for <b>
+    open_b = len(re.findall(r"<b\b", text, re.I))
+    close_b = len(re.findall(r"</b>", text, re.I))
+    if open_b > close_b:
+        text += "</b>" * (open_b - close_b)
+
     return text.strip()
 
 
 def strip_html_tags(text: str) -> str:
-    """Remove all HTML tags for plain-text fallback."""
+    """Remove all HTML tags for plain-text fallback. Keep link text + URL readable."""
     if not text:
         return text
-    # Keep link URLs readable
     text = re.sub(r'<a\s+href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', r'\2 (\1)', text, flags=re.I | re.S)
     text = re.sub(r'<[^>]+>', '', text)
     text = html.unescape(text)
@@ -151,7 +183,7 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "1. Send any photo to set thumbnail.\n"
         "2. /fonts — choose caption font.\n"
         "3. /caption — set Auto Caption template.\n"
-        "   Supports HTML: &lt;a&gt; &lt;b&gt; &lt;blockquote&gt;\n"
+        "   Supports HTML: <a> <b> <blockquote>\n"
         "   Placeholders: {filename} {file_name} {original}\n"
         "4. /channel — link destination channel.\n"
         "5. Send any video — cover + caption apply instantly!\n\n"
@@ -317,20 +349,28 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as parse_err:
                 err_str = str(parse_err).lower()
                 if parse_mode_html and ("parse" in err_str or "entities" in err_str or "tag" in err_str):
-                    # HTML failed → fallback plain text
-                    logger.warning(f"HTML caption failed, falling back to plain: {parse_err}")
-                    final_caption = strip_html_tags(raw_caption)
-                    final_html = False
+                    # HTML failed → try one more aggressive clean then plain fallback
+                    logger.warning(f"HTML caption failed, trying extra clean: {parse_err}")
+                    cleaned2 = sanitize_telegram_html(raw_caption)
                     try:
-                        await try_edit_media(final_caption, False)
+                        await try_edit_media(cleaned2, True)
                         sent_to_user = True
-                        await update.message.reply_text(
-                            "⚠️ HTML caption me error tha, plain text se bhej diya.\n"
-                            "Template thik karo: Settings → Auto Caption → Change",
-                            parse_mode="HTML"
-                        )
-                    except Exception as e2:
-                        raise e2
+                        final_caption = cleaned2
+                        final_html = True
+                    except Exception:
+                        logger.warning("Still failed after extra clean, falling back to plain")
+                        final_caption = strip_html_tags(raw_caption)
+                        final_html = False
+                        try:
+                            await try_edit_media(final_caption, False)
+                            sent_to_user = True
+                            await update.message.reply_text(
+                                "⚠️ HTML caption me error tha, plain text se bhej diya.\n"
+                                "Template thik karo: Settings → Auto Caption → Change",
+                                parse_mode="HTML"
+                            )
+                        except Exception as e2:
+                            raise e2
                 else:
                     raise parse_err
 
