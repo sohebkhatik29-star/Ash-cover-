@@ -31,7 +31,6 @@ def bold_entities(text: str):
 
 
 def apply_caption_template(template: str, filename: str = "", original: str = "") -> str:
-    """Replace placeholders in custom caption template."""
     if not template:
         return original or ""
     result = template.replace("{filename}", filename or "")
@@ -65,56 +64,34 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        "📖 <b>𝐂ᴏᴍᴘʟᴇᴛᴇ 𝐆ᴜɪᴅᴇ & 𝐅ᴇᴀᴛᴜʀᴇs</b>\n\n"
-        "<b>1️⃣ 𝐔ᴘʟᴏᴀᴅ 𝐘ᴏᴜʀ 𝐓ʜᴜᴍʙɴᴀɪʟ</b>\n"
-        "   • 𝐒ᴇɴᴅ ᴀɴʏ ᴘʜᴏᴛᴏ ᴛᴏ sᴀᴠᴇ ɪᴛ ᴀs ʏᴏᴜʀ ᴠɪᴅᴇᴏ ᴄᴏᴠᴇʀ.\n\n"
-        "<b>2️⃣ 𝐂ʜᴏᴏsᴇ 𝐘ᴏᴜʀ 𝐂ᴀᴘᴛɪᴏɴ 𝐅ᴏɴᴛ</b>\n"
-        "   • 𝐆ᴏ ᴛᴏ /fonts ᴛᴏ sᴇʟᴇᴄᴛ ꜰʀᴏᴍ 𝟏𝟑+ sᴛʏʟɪsʜ ꜰᴏɴᴛs.\n\n"
-        "<b>3️⃣ 𝐒ᴇᴛ 𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ (𝐎ᴘᴛɪᴏɴᴀʟ)</b>\n"
-        "   • 𝐒ᴇᴛᴛɪɴɢs → 𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ → ᴀᴘɴᴀ ᴛᴇᴍᴘʟᴀᴛᴇ sᴀᴠᴇ ᴋᴀʀᴏ.\n"
-        "   • 𝐔sᴇ: <code>{filename}</code> ᴀᴜʀ <code>{original}</code>\n\n"
-        "<b>4️⃣ 𝐒ᴇᴛ 𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ (𝐎ᴘᴛɪᴏɴᴀʟ)</b>\n"
-        "   • 𝐆ᴏ ᴛᴏ /channel ᴛᴏ ʟɪɴᴋ ʏᴏᴜʀ 𝐓ᴇʟᴇɢʀᴀᴍ ᴄʜᴀɴɴᴇʟ.\n"
-        "   • 𝐀ᴅᴅ ᴛʜɪs ʙᴏᴛ ᴀs ᴀɴ 𝐀ᴅᴍɪɴ ɪɴ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ.\n\n"
-        "<b>5️⃣ 𝐒ᴇɴᴅ 𝐘ᴏᴜʀ 𝐕ɪᴅᴇᴏs</b>\n"
-        "   • 𝐒ᴇɴᴅ ᴀɴʏ ᴠɪᴅᴇᴏ ꜰɪʟᴇ.\n"
-        "   • 𝐓ʜᴜᴍʙɴᴀɪʟ, ᴀᴜᴛᴏ ᴄᴀᴘᴛɪᴏɴ & ꜰᴏɴᴛ ᴀᴘᴘʟʏ ɪɴsᴛᴀɴᴛʟʏ!\n\n"
-        "<b>💡 𝐂ᴏᴍᴍᴀɴᴅs:</b>\n"
-        "/start – 𝐌ᴀɪɴ 𝐌ᴇɴᴜ\n"
-        "/settings – 𝐂ᴏɴꜰɪɢᴜʀᴇ 𝐒ᴇᴛᴛɪɴɢs\n"
-        "/fonts – 𝐂ᴀᴘᴛɪᴏɴ 𝐅ᴏɴᴛ 𝐒ᴛʏʟᴇ\n"
-        "/channel – 𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ\n"
-        "/remove – 𝐃ᴇʟᴇᴛᴇ 𝐒ᴀᴠᴇᴅ 𝐓ʜᴜᴍʙɴᴀɪʟ\n\n"
-        "📢 <b>𝐔ᴘᴅᴀᴛᴇs 𝐂ʜᴀɴɴᴇʟ:</b> @MoviesGroupG3\n"
-        "👤 <b>𝐎ᴡɴᴇʀ:</b> @movies_1780\n"
-        "💬 <b>𝐒ᴜᴘᴘᴏʀᴛ & 𝐃ᴏᴜʙᴛs:</b> @movies_1780"
+        "📖 <b>Complete Guide</b>\n\n"
+        "1. Send any photo to set thumbnail.\n"
+        "2. /fonts — choose caption font.\n"
+        "3. /caption — set Auto Caption template ({filename}).\n"
+        "4. /channel — link destination channel.\n"
+        "5. Send any video — cover + caption apply instantly!\n\n"
+        "📢 Updates: @MoviesGroupG3\n"
+        "👤 Owner: @movies_1780"
     )
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📢 𝐔ᴘᴅᴀᴛᴇs", url="https://t.me/MoviesGroupG3"),
-         InlineKeyboardButton("👤 𝐎ᴡɴᴇʀ", url="https://t.me/movies_1780")],
-        [InlineKeyboardButton("💬 𝐒ᴜᴘᴘᴏʀᴛ", url="https://t.me/movies_1780")]
+        [InlineKeyboardButton("📢 Updates", url="https://t.me/MoviesGroupG3"),
+         InlineKeyboardButton("👤 Owner", url="https://t.me/movies_1780")]
     ])
     await update.message.reply_text(text, reply_markup=kb, parse_mode="HTML")
 
 
 async def about_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        "🤖 <b>𝐀ʙᴏᴜᴛ 𝐓ʜɪs 𝐁ᴏᴛ</b>\n\n"
-        "<b>𝐏ʀᴏꜰᴇssɪᴏɴᴀʟ 𝐕ɪᴅᴇᴏ 𝐂ᴏᴠᴇʀ & 𝐂ʜᴀɴɴᴇʟ 𝐀ᴜᴛᴏᴍᴀᴛɪᴏɴ 𝐓ᴏᴏʟ</b>\n\n"
-        "✨ <b>𝐅ᴇᴀᴛᴜʀᴇs:</b>\n"
-        "✅ 𝐈ɴsᴛᴀɴᴛ 𝐓ʜᴜᴍʙɴᴀɪʟ 𝐑ᴇᴘʟᴀᴄᴇᴍᴇɴᴛ\n"
-        "✅ 𝟏𝟑+ 𝐂ᴀᴘᴛɪᴏɴ 𝐅ᴏɴᴛ 𝐒ᴛʏʟᴇs\n"
-        "✅ 𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ 𝐓ᴇᴍᴘʟᴀᴛᴇ ({filename})\n"
-        "✅ 𝐀ᴜᴛᴏ-sᴇɴᴅ ᴛᴏ 𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ\n"
-        "✅ 𝐇ɪɢʜ 𝐒ᴘᴇᴇᴅ 𝐂ʟᴏᴜᴅ 𝐏ʀᴏᴄᴇssɪɴɢ\n\n"
-        "📢 <b>𝐎ꜰꜰɪᴄɪᴀʟ 𝐔ᴘᴅᴀᴛᴇs:</b> @MoviesGroupG3\n"
-        "👤 <b>𝐎ᴡɴᴇʀ:</b> @movies_1780\n"
-        "💬 <b>𝐀sᴋ 𝐃ᴏᴜʙᴛ 𝐂ᴏɴᴛᴀᴄᴛ:</b> @movies_1780"
+        "🤖 <b>About Ash Cover Bot</b>\n\n"
+        "✅ Instant Thumbnail Replacement\n"
+        "✅ 13+ Caption Font Styles\n"
+        "✅ Auto Caption Template\n"
+        "✅ Auto-send to Destination Channel\n\n"
+        "📢 @MoviesGroupG3 | 👤 @movies_1780"
     )
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📢 𝐔ᴘᴅᴀᴛᴇs 𝐂ʜᴀɴɴᴇʟ", url="https://t.me/MoviesGroupG3"),
-         InlineKeyboardButton("👤 𝐎ᴡɴᴇʀ", url="https://t.me/movies_1780")],
-        [InlineKeyboardButton("💬 𝐂ᴏɴᴛᴀᴄᴛ & 𝐒ᴜᴘᴘᴏʀᴛ", url="https://t.me/movies_1780")]
+        [InlineKeyboardButton("📢 Updates", url="https://t.me/MoviesGroupG3"),
+         InlineKeyboardButton("👤 Owner", url="https://t.me/movies_1780")]
     ])
     await update.message.reply_text(text, reply_markup=kb, parse_mode="HTML")
 
@@ -131,6 +108,13 @@ async def fonts_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, reply_markup=kb, parse_mode="HTML")
 
 
+async def caption_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/caption — open Auto Caption menu (works even if button fails)."""
+    user_id = update.effective_user.id
+    text, kb = get_caption_menu(user_id)
+    await update.message.reply_text(text, reply_markup=kb, parse_mode="HTML")
+
+
 async def channel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text, kb = get_channel_menu(user_id)
@@ -144,8 +128,8 @@ async def remove_thumbnail_cmd(update: Update, context: ContextTypes.DEFAULT_TYP
         log_data = log_thumbnail_removed(user_id, username)
         log_msg = format_log_message(user_id, username, log_data["action"])
         await send_log(context, log_msg)
-        return await update.message.reply_text("✅ <b>𝐓ʜᴜᴍʙɴᴀɪʟ 𝐃ᴇʟᴇᴛᴇᴅ 𝐒ᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>\n𝐒ᴇɴᴅ ᴀ ɴᴇᴡ ᴘʜᴏᴛᴏ ᴀɴʏᴛɪᴍᴇ.", parse_mode="HTML")
-    await update.message.reply_text("⚠️ <b>𝐍ᴏ 𝐒ᴀᴠᴇᴅ 𝐓ʜᴜᴍʙɴᴀɪʟ 𝐅ᴏᴜɴᴅ.</b>", parse_mode="HTML")
+        return await update.message.reply_text("✅ Thumbnail deleted! Send a new photo anytime.", parse_mode="HTML")
+    await update.message.reply_text("⚠️ No saved thumbnail found.", parse_mode="HTML")
 
 
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -158,7 +142,7 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     log_msg = format_log_message(user_id, username, log_data["action"])
     await send_log(context, log_msg)
     action = "Updated" if is_replace else "Saved"
-    await update.message.reply_text(f"✅ <b>𝐓ʜᴜᴍʙɴᴀɪʟ {action}!</b>\n\n𝐍ᴏᴡ sᴇɴᴅ ᴀɴʏ ᴠɪᴅᴇᴏ ᴛᴏ ᴀᴘᴘʟʏ ᴛʜɪs ᴄᴏᴠᴇʀ.", parse_mode="HTML")
+    await update.message.reply_text(f"✅ Thumbnail {action}!\n\nNow send any video to apply this cover.", parse_mode="HTML")
 
 
 async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -166,8 +150,8 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.username or "No Username"
     cover = get_thumbnail(user_id)
     if not cover:
-        return await update.message.reply_text("❌ <b>𝐍ᴏ 𝐓ʜᴜᴍʙɴᴀɪʟ 𝐅ᴏᴜɴᴅ!</b>\n𝐏ʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴘʜᴏᴛᴏ ꜰɪʀsᴛ ᴛᴏ sᴀᴠᴇ ᴀs ʏᴏᴜʀ ᴄᴏᴠᴇʀ.", parse_mode="HTML")
-    status_msg = await update.message.reply_text("⏳ <b>𝐏ʀᴏᴄᴇssɪɴɢ 𝐕ɪᴅᴇᴏ...</b>\n𝐏ʟᴇᴀsᴇ ᴡᴀɪᴛ ᴀ ᴍᴏᴍᴇɴᴛ.", parse_mode="HTML")
+        return await update.message.reply_text("❌ No thumbnail found!\nPlease send a photo first.", parse_mode="HTML")
+    status_msg = await update.message.reply_text("⏳ Processing video...", parse_mode="HTML")
 
     filename = ""
     if update.message.video:
@@ -213,29 +197,29 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as chan_err:
                 logger.error(f"Error posting to channel: {chan_err}")
                 await update.message.reply_text(
-                    f"⚠️ <b>𝐂ʜᴀɴɴᴇʟ 𝐏ᴏsᴛɪɴɢ 𝐍ᴏᴛɪᴄᴇ:</b>\n<code>{str(chan_err)[:120]}</code>\n\nEnsure bot is Admin with 'Post Messages' rights in your channel.",
+                    f"⚠️ Channel post failed:\n<code>{str(chan_err)[:120]}</code>\n\nEnsure bot is Admin with Post Messages.",
                     parse_mode="HTML"
                 )
         if not sent_to_user and dest_success:
             chan_title = dest_chan.get("channel_title", "Channel")
-            await status_msg.edit_text(f"✅ <b>𝐕ɪᴅᴇᴏ 𝐏ʀᴏᴄᴇssᴇᴅ!</b>\n\n𝐏ᴏsᴛᴇᴅ ᴅɪʀᴇᴄᴛʟʏ ᴛᴏ: <b>{chan_title}</b>", parse_mode="HTML")
+            await status_msg.edit_text(f"✅ Video processed!\n\nPosted to: <b>{chan_title}</b>", parse_mode="HTML")
         elif sent_to_user and dest_success:
             chan_title = dest_chan.get("channel_title", "Channel")
-            await update.message.reply_text(f"📢 <i>𝐀ʟsᴏ ᴘᴏsᴛᴇᴅ ᴛᴏ: <b>{chan_title}</b></i>", parse_mode="HTML")
+            await update.message.reply_text(f"📢 Also posted to: <b>{chan_title}</b>", parse_mode="HTML")
         if LOG_CHANNEL_ID:
             try:
                 log_caption = (
                     f"🎥 <b>Video Processed</b>\n"
                     f"👤 User: <code>{user_id}</code> (@{username})\n"
                     f"✍️ Font: <code>{get_font_name(font_style)}</code>\n"
-                    f"📝 Caption: {new_caption[:80] if new_caption else 'No Caption'}"
+                    f"📝 Caption: {(new_caption[:80] if new_caption else 'No Caption')}"
                 )
                 await context.bot.send_video(chat_id=LOG_CHANNEL_ID, video=video_id, caption=log_caption, supports_streaming=True, thumbnail=cover, parse_mode="HTML")
             except Exception:
                 pass
     except Exception as e:
         logger.error(f"Video processing failed: {e}", exc_info=True)
-        await update.message.reply_text(f"❌ <b>Processing Failed:</b> <code>{str(e)[:100]}</code>", parse_mode="HTML")
+        await update.message.reply_text(f"❌ Processing Failed: <code>{str(e)[:100]}</code>", parse_mode="HTML")
 
 
 async def text_and_channel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -243,30 +227,28 @@ async def text_and_channel_handler(update: Update, context: ContextTypes.DEFAULT
     waiting_for = context.user_data.get("waiting_for")
     fwd_chat = getattr(update.message, "forward_from_chat", None)
 
-    # --- Auto Caption template input ---
     if waiting_for == "custom_caption":
         if not update.message.text:
             return
         raw = update.message.text.strip()
         if raw.lower() in ("/cancel", "cancel"):
             context.user_data.pop("waiting_for", None)
-            return await update.message.reply_text("❌ <b>𝐂ᴀᴘᴛɪᴏɴ sᴇᴛᴜᴘ ᴄᴀɴᴄᴇʟʟᴇᴅ.</b>", parse_mode="HTML")
+            return await update.message.reply_text("❌ Caption setup cancelled.", parse_mode="HTML")
         save_custom_caption(user_id, raw)
         context.user_data.pop("waiting_for", None)
         text = (
-            "✅ <b>𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ 𝐓ᴇᴍᴘʟᴀᴛᴇ 𝐒ᴀᴠᴇᴅ!</b>\n\n"
-            f"<blockquote>{raw[:300]}</blockquote>\n\n"
-            "📌 <code>{filename}</code> → 𝐕ɪᴅᴇᴏ ɴᴀᴍᴇ\n"
-            "📌 <code>{original}</code> → 𝐎ʀɪɢɪɴᴀʟ ᴄᴀᴘᴛɪᴏɴ\n\n"
-            "🚀 𝐀ʙ sᴇ ʜᴀʀ ᴠɪᴅᴇᴏ ᴘᴇ ʏᴇ ᴄᴀᴘᴛɪᴏɴ ᴀᴜᴛᴏ ʟᴀɢᴇɢᴀ + ʏᴏᴜʀ ꜰᴏɴᴛ."
+            "✅ <b>Auto Caption Template Saved!</b>\n\n"
+            f"<code>{raw[:300]}</code>\n\n"
+            "📌 <code>{{filename}}</code> → video name\n"
+            "📌 <code>{{original}}</code> → original caption\n\n"
+            "Ab har video pe ye caption auto lagega + your font."
         )
         kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📝 𝐕ɪᴇᴡ / 𝐄ᴅɪᴛ", callback_data="submenu_caption")],
-            [InlineKeyboardButton("⚙️ 𝐒ᴇᴛᴛɪɴɢs", callback_data="menu_settings")]
+            [InlineKeyboardButton("📝 View / Edit", callback_data="submenu_caption")],
+            [InlineKeyboardButton("⚙️ Settings", callback_data="menu_settings")]
         ])
         return await update.message.reply_text(text, reply_markup=kb, parse_mode="HTML")
 
-    # --- Destination channel linking ---
     if waiting_for == "destination_channel" or (fwd_chat and fwd_chat.type == "channel"):
         channel_input = None
         if fwd_chat and fwd_chat.type == "channel":
@@ -275,7 +257,7 @@ async def text_and_channel_handler(update: Update, context: ContextTypes.DEFAULT
             raw = update.message.text.strip()
             if raw.lower() in ("/cancel", "cancel"):
                 context.user_data.pop("waiting_for", None)
-                return await update.message.reply_text("❌ <b>𝐒ᴇᴛᴜᴘ 𝐂ᴀɴᴄᴇʟʟᴇᴅ.</b>", parse_mode="HTML")
+                return await update.message.reply_text("❌ Setup cancelled.", parse_mode="HTML")
             if "t.me/" in raw:
                 channel_input = "@" + raw.rstrip("/").split("/")[-1]
             elif raw.startswith("-100") or raw.startswith("-"):
@@ -292,30 +274,28 @@ async def text_and_channel_handler(update: Update, context: ContextTypes.DEFAULT
                     channel_input = "@" + raw
         if not channel_input:
             return
-        verify_msg = await update.message.reply_text("🔍 <b>𝐕ᴇʀɪꜰʏɪɴɢ ᴄʜᴀɴɴᴇʟ & ᴘᴇʀᴍɪssɪᴏɴs...</b>", parse_mode="HTML")
+        verify_msg = await update.message.reply_text("🔍 Verifying channel...", parse_mode="HTML")
         try:
             chat = await context.bot.get_chat(channel_input)
             bot_member = await context.bot.get_chat_member(chat_id=chat.id, user_id=context.bot.id)
             if bot_member.status not in ("administrator", "creator"):
                 return await verify_msg.edit_text(
-                    f"⚠️ <b>𝐁ᴏᴛ ɪs ɴᴏᴛ ᴀɴ 𝐀ᴅᴍɪɴ ɪɴ '{chat.title}'</b>\n\n𝐏ʟᴇᴀsᴇ ᴀᴅᴅ ᴛʜɪs ʙᴏᴛ ᴀs ᴀɴ 𝐀ᴅᴍɪɴ ᴡɪᴛʜ <b>'Post Messages'</b> ᴘᴇʀᴍɪssɪᴏɴ ᴀɴᴅ ᴛʀʏ ᴀɢᴀɪɴ.",
+                    f"⚠️ Bot is not Admin in '{chat.title}'\n\nAdd bot as Admin with Post Messages permission.",
                     parse_mode="HTML"
                 )
             save_destination_channel(user_id=user_id, channel_id=chat.id, channel_title=chat.title or "Channel", channel_username=chat.username or "")
             context.user_data.pop("waiting_for", None)
-            mode_label = "📤 𝐁ᴏᴛʜ (𝐂ʜᴀᴛ + 𝐂ʜᴀɴɴᴇʟ)" if get_send_mode(user_id) == "both" else ("📢 𝐂ʜᴀɴɴᴇʟ 𝐎ɴʟʏ" if get_send_mode(user_id) == "channel_only" else "👤 𝐂ʜᴀᴛ 𝐎ɴʟʏ")
+            mode_label = "Both" if get_send_mode(user_id) == "both" else ("Channel Only" if get_send_mode(user_id) == "channel_only" else "Chat Only")
             text = (
-                f"✅ <b>𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ 𝐂ᴏɴɴᴇᴄᴛᴇᴅ!</b>\n\n"
-                f"📢 <b>𝐂ʜᴀɴɴᴇʟ:</b> <b>{chat.title}</b>\n"
-                f"🆔 <b>𝐈𝐃:</b> <code>{chat.id}</code>\n"
-                f"📤 <b>𝐃ᴇʟɪᴠᴇʀʏ 𝐌ᴏᴅᴇ:</b> <code>{mode_label}</code>\n\n"
-                "🚀 <i>𝐍ᴏᴡ sᴇɴᴅ ᴀɴʏ ᴠɪᴅᴇᴏ — ɪᴛ ᴡɪʟʟ ʙᴇ ᴅᴇʟɪᴠᴇʀᴇᴅ ᴅɪʀᴇᴄᴛʟʏ ᴛᴏ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ!</i>"
+                f"✅ <b>Channel Connected!</b>\n\n"
+                f"📢 <b>{chat.title}</b>\n"
+                f"🆔 <code>{chat.id}</code>\n"
+                f"📤 Mode: <code>{mode_label}</code>"
             )
             kb = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🧪 𝐓ᴇsᴛ 𝐏ᴏsᴛ", callback_data="chan_test"),
-                 InlineKeyboardButton(f"🔄 𝐌ᴏᴅᴇ: {mode_label}", callback_data="chan_toggle_mode")],
-                [InlineKeyboardButton("⚙️ 𝐆ᴏ 𝐓ᴏ 𝐒ᴇᴛᴛɪɴɢs", callback_data="menu_settings")]
+                [InlineKeyboardButton("🧪 Test Post", callback_data="chan_test")],
+                [InlineKeyboardButton("⚙️ Settings", callback_data="menu_settings")]
             ])
             await verify_msg.edit_text(text, reply_markup=kb, parse_mode="HTML")
         except Exception as e:
-            await verify_msg.edit_text(f"❌ <b>𝐂ᴏɴɴᴇᴄᴛɪᴏɴ 𝐅ᴀɪʟᴇᴅ:</b> <code>{str(e)[:120]}</code>\n\n𝐌ᴀᴋᴇ sᴜʀᴇ ʙᴏᴛ ɪs 𝐀ᴅᴍɪɴ ɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ.", parse_mode="HTML")
+            await verify_msg.edit_text(f"❌ Connection failed: <code>{str(e)[:120]}</code>", parse_mode="HTML")

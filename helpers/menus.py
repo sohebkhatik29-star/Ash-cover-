@@ -2,11 +2,10 @@
 Menu and UI Layout Handlers for Ash Cover Bot
 """
 
-import os
+import html
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile
-from telegram.ext import ContextTypes
-from config import HOME_MENU_BANNER_URL, OWNER_USERNAME
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from config import OWNER_USERNAME
 from database import (
     has_thumbnail, get_font_style, get_destination_channel,
     get_send_mode, is_admin, get_custom_caption
@@ -17,131 +16,122 @@ logger = logging.getLogger(__name__)
 
 
 def get_home_menu_markup(user_id: int) -> InlineKeyboardMarkup:
-    """Build home menu keyboard with role-based buttons"""
     kb_rows = [
-        [InlineKeyboardButton("❓ 𝐇ᴇʟᴘ", callback_data="menu_help"),
-         InlineKeyboardButton("ℹ️ 𝐀ʙᴏᴜᴛ", callback_data="menu_about")],
-        [InlineKeyboardButton("⚙️ 𝐒ᴇᴛᴛɪɴɢs", callback_data="menu_settings"),
-         InlineKeyboardButton("👨‍💻 𝐃ᴇᴠᴇʟᴏᴘᴇʀ", callback_data="menu_developer")]
+        [InlineKeyboardButton("❓ Help", callback_data="menu_help"),
+         InlineKeyboardButton("ℹ️ About", callback_data="menu_about")],
+        [InlineKeyboardButton("⚙️ Settings", callback_data="menu_settings"),
+         InlineKeyboardButton("👨‍💻 Developer", callback_data="menu_developer")]
     ]
     if is_admin(user_id):
-        kb_rows.append([InlineKeyboardButton("🛡️ 𝐀ᴅᴍɪɴ 𝐏ᴀɴᴇʟ", callback_data="admin_back")])
+        kb_rows.append([InlineKeyboardButton("🛡️ Admin Panel", callback_data="admin_back")])
     return InlineKeyboardMarkup(kb_rows)
 
 
 def get_home_menu_text() -> str:
-    """Get home menu display text"""
     return (
-        "<b>𝐖ᴇʟᴄᴏᴍᴇ 𝐓ᴏ 𝐀sʜ 𝐂ᴏᴠᴇʀ 𝐁ᴏᴛ</b>\n\n"
-        "🎬 <b>𝐏ʀᴏꜰᴇssɪᴏɴᴀʟ 𝐕ɪᴅᴇᴏ 𝐂ᴏᴠᴇʀ 𝐓ᴏᴏʟ</b>\n\n"
-        "⚡ <b>𝐐ᴜɪᴄᴋ 𝐒ᴛᴀʀᴛ:</b>\n\n"
-        "📸 <b>𝐔ᴘʟᴏᴀᴅ 𝐏ʜᴏᴛᴏ</b>\n"
-        "   𝐘ᴏᴜʀ ᴛʜᴜᴍʙɴᴀɪʟ sᴀᴠᴇs ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ\n\n"
-        "🎥 <b>𝐒ᴇɴᴅ 𝐕ɪᴅᴇᴏ</b>\n"
-        "   𝐓ʜᴜᴍʙɴᴀɪʟ ᴀᴘᴘʟɪᴇs ɪɴsᴛᴀɴᴛʟʏ\n\n"
-        "🌟 <b>𝐊ᴇʏ 𝐅ᴇᴀᴛᴜʀᴇs:</b>\n"
-        "✅ 𝐎ɴᴇ-𝐂ʟɪᴄᴋ 𝐀ᴘᴘʟɪᴄᴀᴛɪᴏɴ\n"
-        "✅ 𝐇ɪɢʜ-𝐐ᴜᴀʟɪᴛʏ 𝐂ᴏᴠᴇʀs\n"
-        "✅ 𝟏𝟑+ 𝐂ᴀᴘᴛɪᴏɴ 𝐅ᴏɴᴛ 𝐒ᴛʏʟᴇs\n"
-        "✅ 𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ 𝐓ᴇᴍᴘʟᴀᴛᴇ\n"
-        "✅ 𝐀ᴜᴛᴏ-𝐒ᴇɴᴅ 𝐓ᴏ 𝐂ʜᴀɴɴᴇʟ\n\n"
-        "💡 <b>𝐂ᴏᴍᴍᴀɴᴅs:</b>\n"
-        "/help – 𝐂ᴏᴍᴘʟᴇᴛᴇ 𝐆ᴜɪᴅᴇ\n"
-        "/settings – 𝐌ᴀɴᴀɢᴇ 𝐂ᴏɴᴛᴇɴᴛ\n"
-        "/fonts – 𝐂ᴀᴘᴛɪᴏɴ 𝐅ᴏɴᴛs\n"
-        "/channel – 𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ\n\n"
+        "<b>Welcome To Ash Cover Bot</b>\n\n"
+        "🎬 <b>Professional Video Cover Tool</b>\n\n"
+        "⚡ <b>Quick Start:</b>\n\n"
+        "📸 <b>Upload Photo</b> — thumbnail saves automatically\n"
+        "🎥 <b>Send Video</b> — thumbnail applies instantly\n\n"
+        "🌟 <b>Key Features:</b>\n"
+        "✅ One-Click Application\n"
+        "✅ High-Quality Covers\n"
+        "✅ 13+ Caption Font Styles\n"
+        "✅ Auto Caption Template\n"
+        "✅ Auto-Send To Channel\n\n"
+        "💡 <b>Commands:</b>\n"
+        "/help /settings /fonts /caption /channel\n\n"
         "📢 Updates: @MoviesGroupG3 | 💬 Support: @movies_1780"
     )
 
 
 def get_settings_menu(user_id: int):
-    """Build settings menu text & keyboard"""
-    thumb_status = "✅ 𝐒ᴀᴠᴇᴅ" if has_thumbnail(user_id) else "❌ 𝐍ᴏᴛ 𝐒ᴀᴠᴇᴅ"
+    thumb_status = "✅ Saved" if has_thumbnail(user_id) else "❌ Not Saved"
     font_key = get_font_style(user_id)
     font_name = get_font_name(font_key)
     dest_chan = get_destination_channel(user_id)
     send_mode = get_send_mode(user_id)
     custom_cap = get_custom_caption(user_id)
-    
-    mode_str = "📤 𝐁ᴏᴛʜ (𝐂ʜᴀᴛ + 𝐂ʜᴀɴɴᴇʟ)" if send_mode == "both" else ("📢 𝐂ʜᴀɴɴᴇʟ 𝐎ɴʟʏ" if send_mode == "channel_only" else "👤 𝐂ʜᴀᴛ 𝐎ɴʟʏ")
-    chan_str = f"✅ {dest_chan.get('channel_title', 'Channel')}" if dest_chan else "❌ 𝐍ᴏᴛ 𝐂ᴏɴꜰɪɢᴜʀᴇᴅ"
-    cap_str = "✅ 𝐒ᴇᴛ" if custom_cap else "❌ 𝐍ᴏᴛ 𝐒ᴇᴛ"
+
+    mode_str = "Both (Chat + Channel)" if send_mode == "both" else ("Channel Only" if send_mode == "channel_only" else "Chat Only")
+    chan_str = f"✅ {html.escape(str(dest_chan.get('channel_title', 'Channel')))}" if dest_chan else "❌ Not Configured"
+    cap_str = "✅ Set" if custom_cap else "❌ Not Set"
 
     text = (
-        "⚙️ <b>𝐁ᴏᴛ 𝐒ᴇᴛᴛɪɴɢs & 𝐏ʀᴇꜰᴇʀᴇɴᴄᴇs</b>\n\n"
-        f"👤 <b>𝐔sᴇʀ 𝐈𝐃:</b> <code>{user_id}</code>\n\n"
-        f"🖼️ <b>𝐓ʜᴜᴍʙɴᴀɪʟ:</b> {thumb_status}\n"
-        f"✍️ <b>𝐂ᴀᴘᴛɪᴏɴ 𝐅ᴏɴᴛ:</b> <code>{font_name}</code>\n"
-        f"📝 <b>𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ:</b> {cap_str}\n"
-        f"📢 <b>𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ:</b> {chan_str}\n"
-        f"📤 <b>𝐃ᴇʟɪᴠᴇʀʏ 𝐌ᴏᴅᴇ:</b> <code>{mode_str}</code>\n\n"
-        "𝐒ᴇʟᴇᴄᴛ ᴀɴ ᴏᴘᴛɪᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴄᴏɴꜰɪɢᴜʀᴇ:"
+        "⚙️ <b>Bot Settings & Preferences</b>\n\n"
+        f"👤 <b>User ID:</b> <code>{user_id}</code>\n\n"
+        f"🖼️ <b>Thumbnail:</b> {thumb_status}\n"
+        f"✍️ <b>Caption Font:</b> <code>{html.escape(str(font_name))}</code>\n"
+        f"📝 <b>Auto Caption:</b> {cap_str}\n"
+        f"📢 <b>Destination Channel:</b> {chan_str}\n"
+        f"📤 <b>Delivery Mode:</b> <code>{mode_str}</code>\n\n"
+        "Select an option below to configure:"
     )
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🖼 𝐓ʜᴜᴍʙɴᴀɪʟ", callback_data="submenu_thumbnails"),
-         InlineKeyboardButton("✍️ 𝐂ᴀᴘᴛɪᴏɴ 𝐅ᴏɴᴛ", callback_data="submenu_fonts")],
-        [InlineKeyboardButton("📝 𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ", callback_data="submenu_caption")],
-        [InlineKeyboardButton("📢 𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ", callback_data="submenu_channel")],
-        [InlineKeyboardButton("⬅️ 𝐁ᴀᴄᴋ", callback_data="menu_back")]
+        [InlineKeyboardButton("🖼 Thumbnail", callback_data="submenu_thumbnails"),
+         InlineKeyboardButton("✍️ Caption Font", callback_data="submenu_fonts")],
+        [InlineKeyboardButton("📝 Auto Caption", callback_data="submenu_caption")],
+        [InlineKeyboardButton("📢 Destination Channel", callback_data="submenu_channel")],
+        [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
     ])
     return text, kb
 
 
 def get_caption_menu(user_id: int):
-    """Build Auto Caption template menu"""
+    """Build Auto Caption template menu — HTML-safe."""
     custom_cap = get_custom_caption(user_id)
     if custom_cap:
-        preview = custom_cap[:200] + ("..." if len(custom_cap) > 200 else "")
+        preview = html.escape(custom_cap[:300])
+        if len(custom_cap) > 300:
+            preview += "..."
         text = (
-            "📝 <b>𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ 𝐓ᴇᴍᴘʟᴀᴛᴇ</b>\n\n"
-            "✅ <b>𝐒ᴛᴀᴛᴜs:</b> 𝐀ᴄᴛɪᴠᴇ\n\n"
-            f"<b>𝐘ᴏᴜʀ 𝐓ᴇᴍᴘʟᴀᴛᴇ:</b>\n"
-            f"<blockquote>{preview}</blockquote>\n\n"
-            "<b>📌 𝐏ʟᴀᴄᴇʜᴏʟᴅᴇʀs:</b>\n"
-            "• <code>{filename}</code> → 𝐕ɪᴅᴇᴏ ꜰɪʟᴇ ɴᴀᴍᴇ\n"
-            "• <code>{original}</code> → 𝐎ʀɪɢɪɴᴀʟ ᴄᴀᴘᴛɪᴏɴ (ɪꜰ ᴀɴʏ)\n\n"
-            "💡 <i>𝐇ᴀʀ ᴠɪᴅᴇᴏ ᴘᴇ ʏᴇ ᴛᴇᴍᴘʟᴀᴛᴇ ᴀᴜᴛᴏ ᴀᴘᴘʟʏ ʜᴏɢᴀ + ʏᴏᴜʀ ꜰᴏɴᴛ sᴛʏʟᴇ.</i>"
+            "📝 <b>Auto Caption Template</b>\n\n"
+            "✅ <b>Status:</b> Active\n\n"
+            "<b>Your Template:</b>\n"
+            f"<code>{preview}</code>\n\n"
+            "<b>Placeholders:</b>\n"
+            "• <code>{{filename}}</code> → video file name\n"
+            "• <code>{{original}}</code> → original caption\n\n"
+            "💡 Every video pe ye template auto apply hoga + your font."
         )
         kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✏️ 𝐂ʜᴀɴɢᴇ 𝐓ᴇᴍᴘʟᴀᴛᴇ", callback_data="cap_set_prompt")],
-            [InlineKeyboardButton("🗑️ 𝐑ᴇᴍᴏᴠᴇ 𝐂ᴀᴘᴛɪᴏɴ", callback_data="cap_delete")],
-            [InlineKeyboardButton("⬅️ 𝐁ᴀᴄᴋ 𝐓ᴏ 𝐒ᴇᴛᴛɪɴɢs", callback_data="menu_settings")]
+            [InlineKeyboardButton("✏️ Change Template", callback_data="cap_set_prompt")],
+            [InlineKeyboardButton("🗑️ Remove Caption", callback_data="cap_delete")],
+            [InlineKeyboardButton("⬅️ Back To Settings", callback_data="menu_settings")]
         ])
     else:
         text = (
-            "📝 <b>𝐀ᴜᴛᴏ 𝐂ᴀᴘᴛɪᴏɴ 𝐓ᴇᴍᴘʟᴀᴛᴇ</b>\n\n"
-            "❌ <b>𝐒ᴛᴀᴛᴜs:</b> 𝐍ᴏᴛ 𝐒ᴇᴛ\n\n"
-            "<b>🚀 𝐖ʜᴀᴛ ɪs ᴛʜɪs?</b>\n"
-            "𝐀ᴘɴᴀ ᴄᴜsᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ ᴛᴇᴍᴘʟᴀᴛᴇ sᴀᴠᴇ ᴋᴀʀᴏ. 𝐇ᴀʀ ᴠɪᴅᴇᴏ ᴘᴇ ʏᴇ ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ ʟᴀɢ ᴊᴀʏᴇɢᴀ.\n\n"
-            "<b>📌 𝐏ʟᴀᴄᴇ𝐡ᴏ𝐥ᴅᴇ𝐫s (ᴜsᴇ ᴋᴀʀ sᴀᴋᴛᴇ ʜᴏ):</b>\n"
-            "• <code>{filename}</code> → 𝐕ɪᴅᴇᴏ ꜰɪʟᴇ ɴᴀᴍᴇ\n"
-            "• <code>{original}</code> → 𝐎ʀɪɢɪɴᴀʟ ᴄᴀᴘᴛɪᴏɴ\n\n"
-            "<b>📌 𝐄xᴀᴍᴘʟᴇ:</b>\n"
-            "<code>{filename}\n\n📢 @MoviesGroupG3</code>\n\n"
-            "𝐘ᴀ:\n"
-            "<code>🎬 {filename}\n{original}\n\n🔗 Join: @MoviesGroupG3</code>"
+            "📝 <b>Auto Caption Template</b>\n\n"
+            "❌ <b>Status:</b> Not Set\n\n"
+            "Apna custom caption template save karo.\n"
+            "Har video pe ye automatically lag jayega.\n\n"
+            "<b>Placeholders:</b>\n"
+            "• <code>{{filename}}</code> → video file name\n"
+            "• <code>{{original}}</code> → original caption\n\n"
+            "<b>Example:</b>\n"
+            "<code>{{filename}}\n\n📢 @MoviesGroupG3</code>"
         )
         kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("➕ 𝐒ᴇᴛ 𝐂ᴀᴘᴛɪᴏɴ 𝐓ᴇᴍᴘʟᴀᴛᴇ", callback_data="cap_set_prompt")],
-            [InlineKeyboardButton("⬅️ 𝐁ᴀᴄᴋ 𝐓ᴏ 𝐒ᴇᴛᴛɪɴɢs", callback_data="menu_settings")]
+            [InlineKeyboardButton("➕ Set Caption Template", callback_data="cap_set_prompt")],
+            [InlineKeyboardButton("⬅️ Back To Settings", callback_data="menu_settings")]
         ])
     return text, kb
 
 
 def get_fonts_menu(user_id: int):
-    """Build fonts selection menu"""
     current_font = get_font_style(user_id)
     font_name = get_font_name(current_font)
     sample_preview = format_caption("Movie Name (2024) [1080p Web-DL]", current_font)
-    
+
     text = (
-        "✍️ <b>𝐂ᴀᴘᴛɪᴏɴ 𝐅ᴏɴᴛ 𝐒ᴛʏʟᴇ 𝐒ᴇᴛᴛɪɴɢs</b>\n\n"
-        f"<b>𝐂ᴜʀʀᴇɴᴛ 𝐅ᴏɴᴛ:</b> <code>{font_name}</code>\n\n"
-        f"<b>𝐋ɪᴠᴇ 𝐏ʀᴇᴠɪᴇᴡ:</b>\n"
-        f"<blockquote>{sample_preview}</blockquote>\n\n"
-        "<i>𝐂ʟɪᴄᴋ ᴀɴʏ ꜰᴏɴᴛ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴀᴘᴘʟʏ ɪᴛ:</i>"
+        "✍️ <b>Caption Font Style</b>\n\n"
+        f"<b>Current Font:</b> <code>{html.escape(str(font_name))}</code>\n\n"
+        f"<b>Live Preview:</b>\n"
+        f"<code>{html.escape(sample_preview)}</code>\n\n"
+        "<i>Click any font button below to apply:</i>"
     )
-    
+
     font_buttons = []
     row = []
     for s in FONT_STYLES:
@@ -153,50 +143,48 @@ def get_fonts_menu(user_id: int):
             row = []
     if row:
         font_buttons.append(row)
-    font_buttons.append([InlineKeyboardButton("⬅️ 𝐁ᴀᴄᴋ 𝐓ᴏ 𝐒ᴇᴛᴛɪɴɢs", callback_data="menu_settings")])
-    
+    font_buttons.append([InlineKeyboardButton("⬅️ Back To Settings", callback_data="menu_settings")])
+
     return text, InlineKeyboardMarkup(font_buttons)
 
 
 def get_channel_menu(user_id: int):
-    """Build destination channel menu"""
     dest_chan = get_destination_channel(user_id)
     send_mode = get_send_mode(user_id)
-    mode_label = "📤 𝐁ᴏᴛʜ (𝐂ʜᴀᴛ + 𝐂ʜᴀɴɴᴇʟ)" if send_mode == "both" else ("📢 𝐂ʜᴀɴɴᴇʟ 𝐎ɴʟʏ" if send_mode == "channel_only" else "👤 𝐏ʀɪᴠᴀᴛᴇ 𝐂ʜᴀᴛ 𝐎ɴʟʏ")
-    
+    mode_label = "Both (Chat + Channel)" if send_mode == "both" else ("Channel Only" if send_mode == "channel_only" else "Private Chat Only")
+
     if dest_chan:
         chan_id = dest_chan.get("channel_id", "Unknown")
-        chan_title = dest_chan.get("channel_title", "Channel")
-        chan_user = dest_chan.get("channel_username", "")
-        user_disp = f" (@{chan_user})" if chan_user else ""
-        
+        chan_title = html.escape(str(dest_chan.get("channel_title", "Channel")))
+        chan_user = dest_chan.get("channel_username", "") or ""
+        user_disp = f" (@{html.escape(chan_user)})" if chan_user else ""
+
         text = (
-            "📢 <b>𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ 𝐒ᴇᴛᴛɪɴɢs</b>\n\n"
-            f"✅ <b>𝐒ᴛᴀᴛᴜs:</b> 𝐂ᴏɴɴᴇᴄᴛᴇᴅ & 𝐀ᴄᴛɪᴠᴇ\n"
-            f"📢 <b>𝐂ʜᴀɴɴᴇʟ:</b> <b>{chan_title}</b>{user_disp}\n"
-            f"🆔 <b>𝐂ʜᴀɴɴᴇʟ 𝐈𝐃:</b> <code>{chan_id}</code>\n"
-            f"📤 <b>𝐃ᴇʟɪᴠᴇʀʏ 𝐌ᴏᴅᴇ:</b> <code>{mode_label}</code>\n\n"
-            "💡 <i>𝐖ʜᴇɴ ʏᴏᴜ sᴇɴᴅ ᴀɴʏ ᴠɪᴅᴇᴏ, ɪᴛ ᴡɪʟʟ ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ ᴀᴘᴘʟʏ ʏᴏᴜʀ ᴛʜᴜᴍʙɴᴀɪʟ & ꜰᴏɴᴛ ᴀɴᴅ sᴇɴᴅ ᴛᴏ ᴛʜɪs ᴄʜᴀɴɴᴇʟ!</i>"
+            "📢 <b>Destination Channel</b>\n\n"
+            f"✅ <b>Status:</b> Connected\n"
+            f"📢 <b>Channel:</b> <b>{chan_title}</b>{user_disp}\n"
+            f"🆔 <b>ID:</b> <code>{chan_id}</code>\n"
+            f"📤 <b>Mode:</b> <code>{mode_label}</code>\n\n"
+            "💡 When you send any video, thumbnail + font + caption apply and post here."
         )
         chan_kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton(f"🔄 𝐌ᴏᴅᴇ: {mode_label}", callback_data="chan_toggle_mode")],
-            [InlineKeyboardButton("🧪 𝐓ᴇsᴛ 𝐂ᴏɴɴᴇᴄᴛɪᴏɴ", callback_data="chan_test"),
-             InlineKeyboardButton("🔄 𝐂ʜᴀɴɢᴇ 𝐂ʜᴀɴɴᴇʟ", callback_data="chan_set_prompt")],
-            [InlineKeyboardButton("🗑️ 𝐑ᴇᴍᴏᴠᴇ 𝐂ʜᴀɴɴᴇʟ", callback_data="chan_delete")],
-            [InlineKeyboardButton("⬅️ 𝐁ᴀᴄᴋ 𝐓ᴏ 𝐒ᴇᴛᴛɪɴɢs", callback_data="menu_settings")]
+            [InlineKeyboardButton(f"🔄 Mode: {mode_label}", callback_data="chan_toggle_mode")],
+            [InlineKeyboardButton("🧪 Test Connection", callback_data="chan_test"),
+             InlineKeyboardButton("🔄 Change Channel", callback_data="chan_set_prompt")],
+            [InlineKeyboardButton("🗑️ Remove Channel", callback_data="chan_delete")],
+            [InlineKeyboardButton("⬅️ Back To Settings", callback_data="menu_settings")]
         ])
     else:
         text = (
-            "📢 <b>𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ 𝐒ᴇᴛᴛɪɴɢs</b>\n\n"
-            "❌ <b>𝐒ᴛᴀᴛᴜs:</b> 𝐍ᴏᴛ 𝐂ᴏɴɴᴇᴄᴛᴇᴅ\n\n"
-            "<b>🚀 𝐖ʜᴀᴛ 𝐈s 𝐃ᴇsᴛɪɴᴀᴛɪᴏɴ 𝐂ʜᴀɴɴᴇʟ?</b>\n"
-            "𝐂ᴏɴɴᴇᴄᴛ ʏᴏᴜʀ 𝐓ᴇʟᴇɢʀᴀᴍ ᴄʜᴀɴɴᴇʟ. 𝐖ʜᴇɴ ʏᴏᴜ sᴇɴᴅ ᴠɪᴅᴇᴏs ᴛᴏ ᴛʜɪs ʙᴏᴛ, ɪᴛ ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ ᴀᴘᴘʟɪᴇs ʏᴏᴜʀ ᴛʜᴜᴍʙɴᴀɪʟ ᴄᴏᴠᴇʀ, ᴄᴜsᴛᴏᴍ ꜰᴏɴᴛ ᴄᴀᴘᴛɪᴏɴ, ᴀɴᴅ ᴘᴏsᴛs ᴛʜᴇ ʀᴇᴀᴅʏ ᴠɪᴅᴇᴏ ᴅɪʀᴇᴄᴛʟʏ ᴛᴏ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ!\n\n"
-            "<b>📋 𝐐ᴜɪᴄᴋ 𝐒ᴇᴛᴜᴘ:</b>\n"
-            "1️⃣ 𝐀ᴅᴅ ᴛʜɪs ʙᴏᴛ ᴀs ᴀɴ <b>𝐀ᴅᴍɪɴ</b> ɪɴ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ ᴡɪᴛʜ <i>𝐏ᴏsᴛ 𝐌ᴇssᴀɢᴇs</i> ᴘᴇʀᴍɪssɪᴏɴ.\n"
-            "2️⃣ 𝐂ʟɪᴄᴋ ᴛʜᴇ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴄᴏɴɴᴇᴄᴛ."
+            "📢 <b>Destination Channel</b>\n\n"
+            "❌ <b>Status:</b> Not Connected\n\n"
+            "Connect your Telegram channel. Videos will auto apply thumbnail, font, caption and post there.\n\n"
+            "<b>Quick Setup:</b>\n"
+            "1. Add this bot as <b>Admin</b> with <i>Post Messages</i> permission.\n"
+            "2. Click the button below to connect."
         )
         chan_kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("➕ 𝐂ᴏɴɴᴇᴄᴛ 𝐂ʜᴀɴɴᴇʟ", callback_data="chan_set_prompt")],
-            [InlineKeyboardButton("⬅️ 𝐁ᴀᴄᴋ 𝐓ᴏ 𝐒ᴇᴛᴛɪɴɢs", callback_data="menu_settings")]
+            [InlineKeyboardButton("➕ Connect Channel", callback_data="chan_set_prompt")],
+            [InlineKeyboardButton("⬅️ Back To Settings", callback_data="menu_settings")]
         ])
     return text, chan_kb

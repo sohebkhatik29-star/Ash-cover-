@@ -21,7 +21,7 @@ from helpers.callbacks import handle_callback_query
 from helpers.admin import admin_panel_cmd, ban_cmd, unban_cmd, stats_cmd
 from helpers.handlers import (
     start_cmd, help_cmd, about_cmd, settings_cmd, fonts_cmd,
-    channel_cmd, remove_thumbnail_cmd, photo_handler, video_handler,
+    caption_cmd, channel_cmd, remove_thumbnail_cmd, photo_handler, video_handler,
     text_and_channel_handler
 )
 
@@ -33,8 +33,6 @@ logger = logging.getLogger(__name__)
 
 
 class HealthHandler(BaseHTTPRequestHandler):
-    """Minimal HTTP handler so Render Web Service free tier detects an open port."""
-
     def do_GET(self):
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
@@ -46,7 +44,6 @@ class HealthHandler(BaseHTTPRequestHandler):
 
 
 def start_health_server():
-    """Bind to PORT so Render health checks pass (free Web Service)."""
     port = int(os.environ.get("PORT", "10000"))
     try:
         server = HTTPServer(("0.0.0.0", port), HealthHandler)
@@ -57,10 +54,8 @@ def start_health_server():
 
 
 def wrap_sub(handler_fn):
-    """Force-sub check, but allow mid-setup flows (caption/channel input)."""
     async def wrapper(update, context):
         waiting = context.user_data.get("waiting_for")
-        # Allow caption/channel setup text even if force-sub fails momentarily
         if waiting in ("custom_caption", "destination_channel"):
             return await handler_fn(update, context)
         if not await check_force_sub(update, context):
@@ -72,47 +67,42 @@ def wrap_sub(handler_fn):
 async def post_init(application):
     try:
         commands = [
-            BotCommand("start", "🏠 Start Bot & Main Menu"),
-            BotCommand("help", "ℹ️ Complete Guide & Commands"),
-            BotCommand("settings", "⚙️ Bot Preferences & Status"),
-            BotCommand("fonts", "✍️ Change Caption Font Style"),
-            BotCommand("channel", "📢 Destination Channel Setup"),
-            BotCommand("remove", "🗑️ Remove Saved Cover"),
-            BotCommand("about", "🤖 About & Credits"),
-            BotCommand("admin", "🛡️ Admin Control Panel"),
-            BotCommand("stats", "📊 Bot User Stats"),
+            BotCommand("start", "Start Bot & Main Menu"),
+            BotCommand("help", "Complete Guide"),
+            BotCommand("settings", "Bot Preferences"),
+            BotCommand("fonts", "Caption Font Style"),
+            BotCommand("caption", "Auto Caption Template"),
+            BotCommand("channel", "Destination Channel"),
+            BotCommand("remove", "Remove Saved Cover"),
+            BotCommand("about", "About & Credits"),
+            BotCommand("admin", "Admin Panel"),
+            BotCommand("stats", "Bot Stats"),
         ]
         await application.bot.set_my_commands(commands)
-        logger.info("✅ Bot commands registered successfully")
+        logger.info("✅ Bot commands registered")
 
         if LOG_CHANNEL_ID:
             try:
-                startup_msg = (
-                    "🚀 <b>Ash Cover Bot Started Successfully!</b>\n\n"
-                    "⚡ <b>Status:</b> Online & Running\n"
-                    "📢 <b>Updates:</b> @MoviesGroupG3\n"
-                    "💬 <b>Support:</b> @movies_1780"
+                await application.bot.send_message(
+                    chat_id=LOG_CHANNEL_ID,
+                    text="🚀 <b>Ash Cover Bot Started!</b>\n📢 @MoviesGroupG3 | 💬 @movies_1780",
+                    parse_mode="HTML"
                 )
-                await application.bot.send_message(chat_id=LOG_CHANNEL_ID, text=startup_msg, parse_mode="HTML")
-            except Exception as log_err:
-                logger.debug(f"Startup log notice: {log_err}")
+            except Exception:
+                pass
     except Exception as e:
         logger.warning(f"Post init error: {e}")
 
 
 def main():
     if not BOT_TOKEN:
-        logger.error("❌ BOT_TOKEN is missing in config/environment!")
+        logger.error("❌ BOT_TOKEN missing!")
         sys.exit(1)
 
-    print("=" * 60)
+    print("=" * 50)
     print("🚀 Ash Cover Bot Starting...")
-    print("📢 Updates Channel : @MoviesGroupG3")
-    print("💬 Support / Contact: @movies_1780")
-    print("=" * 60)
-
-    logger.info("🚀 Starting Ash Cover Bot...")
-    logger.info("📢 Channel: @MoviesGroupG3 | 💬 Support: @movies_1780")
+    print("📢 @MoviesGroupG3 | 💬 @movies_1780")
+    print("=" * 50)
 
     health_thread = threading.Thread(target=start_health_server, daemon=True)
     health_thread.start()
@@ -124,6 +114,7 @@ def main():
     app.add_handler(CommandHandler("about", wrap_sub(about_cmd), filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("settings", wrap_sub(settings_cmd), filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler(["fonts", "font"], wrap_sub(fonts_cmd), filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler(["caption", "captions"], wrap_sub(caption_cmd), filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler(["channel", "channels"], wrap_sub(channel_cmd), filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler(["remove", "delete"], wrap_sub(remove_thumbnail_cmd), filters=filters.ChatType.PRIVATE))
 
@@ -141,7 +132,7 @@ def main():
 
     app.add_handler(CallbackQueryHandler(handle_callback_query))
 
-    logger.info("✅ All handlers registered. Bot is listening...")
+    logger.info("✅ All handlers registered. Bot listening...")
     app.run_polling(drop_pending_updates=True)
 
 
