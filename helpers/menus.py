@@ -38,7 +38,7 @@ def get_home_menu_text() -> str:
         "✅ One-Click Application\n"
         "✅ High-Quality Covers\n"
         "✅ 13+ Caption Font Styles\n"
-        "✅ Auto Caption Template\n"
+        "✅ Auto Caption Template (HTML supported)\n"
         "✅ Auto-Send To Channel\n\n"
         "💡 <b>Commands:</b>\n"
         "/help /settings /fonts /caption /channel\n\n"
@@ -54,8 +54,13 @@ def get_settings_menu(user_id: int):
     send_mode = get_send_mode(user_id)
     custom_cap = get_custom_caption(user_id)
 
-    mode_str = "Both (Chat + Channel)" if send_mode == "both" else ("Channel Only" if send_mode == "channel_only" else "Chat Only")
-    chan_str = f"✅ {html.escape(str(dest_chan.get('channel_title', 'Channel')))}" if dest_chan else "❌ Not Configured"
+    mode_str = "Both (Chat + Channel)" if send_mode == "both" else (
+        "Channel Only" if send_mode == "channel_only" else "Chat Only"
+    )
+    chan_str = (
+        f"✅ {html.escape(str(dest_chan.get('channel_title', 'Channel')))}"
+        if dest_chan else "❌ Not Configured"
+    )
     cap_str = "✅ Set" if custom_cap else "❌ Not Set"
 
     text = (
@@ -79,7 +84,6 @@ def get_settings_menu(user_id: int):
 
 
 def get_caption_menu(user_id: int):
-    """Build Auto Caption template menu — HTML-safe."""
     custom_cap = get_custom_caption(user_id)
     if custom_cap:
         preview = html.escape(custom_cap[:300])
@@ -91,9 +95,10 @@ def get_caption_menu(user_id: int):
             "<b>Your Template:</b>\n"
             f"<code>{preview}</code>\n\n"
             "<b>Placeholders:</b>\n"
-            "• <code>{{filename}}</code> → video file name\n"
-            "• <code>{{original}}</code> → original caption\n\n"
-            "💡 Every video pe ye template auto apply hoga + your font."
+            "• <code>{filename}</code> or <code>{file_name}</code> → video file name\n"
+            "• <code>{original}</code> → original caption\n\n"
+            "💡 HTML tags (&lt;a&gt; &lt;b&gt; &lt;blockquote&gt;) supported.\n"
+            "Har video pe ye template auto apply hoga."
         )
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("✏️ Change Template", callback_data="cap_set_prompt")],
@@ -107,10 +112,12 @@ def get_caption_menu(user_id: int):
             "Apna custom caption template save karo.\n"
             "Har video pe ye automatically lag jayega.\n\n"
             "<b>Placeholders:</b>\n"
-            "• <code>{{filename}}</code> → video file name\n"
-            "• <code>{{original}}</code> → original caption\n\n"
-            "<b>Example:</b>\n"
-            "<code>{{filename}}\n\n📢 @MoviesGroupG3</code>"
+            "• <code>{filename}</code> or <code>{file_name}</code> → video name\n"
+            "• <code>{original}</code> → original caption\n\n"
+            "<b>Plain example:</b>\n"
+            "<code>{filename}\n\n📢 @MoviesGroupG3</code>\n\n"
+            "<b>HTML example:</b>\n"
+            "<code>&lt;a href=\"https://t.me/MoviesGroupG3\"&gt;&lt;b&gt;{filename}&lt;/b&gt;&lt;/a&gt;</code>"
         )
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("➕ Set Caption Template", callback_data="cap_set_prompt")],
@@ -129,7 +136,8 @@ def get_fonts_menu(user_id: int):
         f"<b>Current Font:</b> <code>{html.escape(str(font_name))}</code>\n\n"
         f"<b>Live Preview:</b>\n"
         f"<code>{html.escape(sample_preview)}</code>\n\n"
-        "<i>Click any font button below to apply:</i>"
+        "<i>Click any font button below to apply:</i>\n"
+        "<i>(Note: HTML captions skip font transform)</i>"
     )
 
     font_buttons = []
@@ -151,7 +159,9 @@ def get_fonts_menu(user_id: int):
 def get_channel_menu(user_id: int):
     dest_chan = get_destination_channel(user_id)
     send_mode = get_send_mode(user_id)
-    mode_label = "Both (Chat + Channel)" if send_mode == "both" else ("Channel Only" if send_mode == "channel_only" else "Private Chat Only")
+    mode_label = "Both (Chat + Channel)" if send_mode == "both" else (
+        "Channel Only" if send_mode == "channel_only" else "Private Chat Only"
+    )
 
     if dest_chan:
         chan_id = dest_chan.get("channel_id", "Unknown")

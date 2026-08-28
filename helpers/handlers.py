@@ -3,6 +3,8 @@ Message, Photo, Video, and Channel Linking Handlers for Ash Cover Bot
 """
 
 import os
+import re
+import html
 import logging
 from telegram import Update, InputMediaVideo, InlineKeyboardButton, InlineKeyboardMarkup, InputFile
 from telegram.ext import ContextTypes
@@ -30,13 +32,36 @@ def bold_entities(text: str):
     return [MessageEntity(type=MessageEntity.BOLD, offset=0, length=len(text))]
 
 
+def looks_like_html(text: str) -> bool:
+    """True if caption contains Telegram HTML tags."""
+    if not text:
+        return False
+    return bool(re.search(
+        r"<(a|b|i|u|s|code|pre|blockquote|tg-spoiler|tg-emoji)\b|/?(a|b|i|u|s|code|pre|blockquote)>" ,
+        text,
+        re.I
+    ))
+
+
 def apply_caption_template(template: str, filename: str = "", original: str = "") -> str:
     if not template:
         return original or ""
-    result = template.replace("{filename}", filename or "")
-    result = result.replace("{original}", original or "")
-    result = result.replace("{caption}", original or "")
-    result = result.replace("{name}", filename or "")
+    name = filename or ""
+    # strip extension for cleaner display if user wants
+    name_no_ext = re.sub(r"\.(mp4|mkv|avi|mov|webm|m4v)$", "", name, flags=re.I) if name else ""
+    result = template
+    for key, val in [
+        ("{filename}", name),
+        ("{file_name}", name),
+        ("{file name}", name),
+        ("{name}", name),
+        ("{FILE_NAME}", name),
+        ("{FILENAME}", name),
+        ("{original}", original or ""),
+        ("{caption}", original or ""),
+        ("{title}", name_no_ext or name),
+    ]:
+        result = result.replace(key, val)
     return result.strip()
 
 
@@ -67,7 +92,9 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📖 <b>Complete Guide</b>\n\n"
         "1. Send any photo to set thumbnail.\n"
         "2. /fonts — choose caption font.\n"
-        "3. /caption — set Auto Caption template ({filename}).\n"
+        "3. /caption — set Auto Caption template.\n"
+        "   Supports HTML: &lt;a&gt; &lt;b&gt; &lt;blockquote&gt;\n"
+        "   Placeholders: {filename} {file_name} {original}\n"
         "4. /channel — link destination channel.\n"
         "5. Send any video — cover + caption apply instantly!\n\n"
         "📢 Updates: @MoviesGroupG3\n"
@@ -85,7 +112,7 @@ async def about_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🤖 <b>About Ash Cover Bot</b>\n\n"
         "✅ Instant Thumbnail Replacement\n"
         "✅ 13+ Caption Font Styles\n"
-        "✅ Auto Caption Template\n"
+        "✅ Auto Caption Template (HTML + plain)\n"
         "✅ Auto-send to Destination Channel\n\n"
         "📢 @MoviesGroupG3 | 👤 @movies_1780"
     )
@@ -109,7 +136,6 @@ async def fonts_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def caption_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/caption — open Auto Caption menu (works even if button fails)."""
     user_id = update.effective_user.id
     text, kb = get_caption_menu(user_id)
     await update.message.reply_text(text, reply_markup=kb, parse_mode="HTML")
@@ -164,7 +190,8 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not filename:
-        filename = "Video"
+        # try from caption or default
+        filename = (update.message.caption or "").split("\n")[0][:80] or "Video"
 
     font_style = get_font_style(user_id)
     original_caption = update.message.caption or ""
@@ -175,51 +202,97 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         raw_caption = original_caption
 
-    new_caption = format_caption(raw_caption, font_style) if raw_caption else ""
-    caption_entities = bold_entities(new_caption) if font_style == "bold" and new_caption else None
+    use_html = looks_like_html(raw_caption)
+
+    if use_html:
+        # HTML template → keep tags, no unicode font transform
+        new_caption = raw_caption
+        caption_entities = None
+        parse_mode = "HTML"
+    else:
+        new_caption = format_caption(raw_caption, font_style) if raw_caption else ""
+        caption_entities = bold_entities(new_caption) if font_style == "bold" and new_caption else None
+        parse_mode = None
+
     dest_chan = get_destination_channel(user_id)
     send_mode = get_send_mode(user_id)
-    media = InputMediaVideo(media=video_id, caption=new_caption, caption_entities=caption_entities, supports_streaming=True, cover=cover)
+
+    media_kwargs = {
+        "media": video_id,
+        "caption": new_caption or None,
+        "supports_streaming": True,
+        "cover": cover,
+    }
+    if use_html:
+        media_kwargs["parse_mode"] = "HTML"
+    elif caption_entities:
+        media_kwargs["caption_entities"] = caption_entities
+
+    media = InputMediaVideo(**media_kwargs)
+
     try:
         sent_to_user = False
         if send_mode in ("both", "user_only") or not dest_chan:
-            await context.bot.edit_message_media(chat_id=update.effective_chat.id, message_id=status_msg.message_id, media=media)
+            await context.bot.edit_message_media(
+                chat_id=update.effective_chat.id,
+                message_id=status_msg.message_id,
+                media=media
+            )
             sent_to_user = True
+
         dest_success = False
         if dest_chan and send_mode in ("both", "channel_only"):
             try:
                 dest_chat_id = dest_chan["channel_id"]
-                await context.bot.send_video(
-                    chat_id=dest_chat_id, video=video_id, caption=new_caption,
-                    caption_entities=caption_entities, supports_streaming=True, thumbnail=cover
-                )
+                send_kwargs = {
+                    "chat_id": dest_chat_id,
+                    "video": video_id,
+                    "caption": new_caption or None,
+                    "supports_streaming": True,
+                    "thumbnail": cover,
+                }
+                if use_html:
+                    send_kwargs["parse_mode"] = "HTML"
+                elif caption_entities:
+                    send_kwargs["caption_entities"] = caption_entities
+                await context.bot.send_video(**send_kwargs)
                 dest_success = True
             except Exception as chan_err:
                 logger.error(f"Error posting to channel: {chan_err}")
                 await update.message.reply_text(
-                    f"⚠️ Channel post failed:\n<code>{str(chan_err)[:120]}</code>\n\nEnsure bot is Admin with Post Messages.",
+                    f"⚠️ Channel post failed:\n<code>{html.escape(str(chan_err)[:120])}</code>\n\nEnsure bot is Admin with Post Messages.",
                     parse_mode="HTML"
                 )
+
         if not sent_to_user and dest_success:
-            chan_title = dest_chan.get("channel_title", "Channel")
+            chan_title = html.escape(str(dest_chan.get("channel_title", "Channel")))
             await status_msg.edit_text(f"✅ Video processed!\n\nPosted to: <b>{chan_title}</b>", parse_mode="HTML")
         elif sent_to_user and dest_success:
-            chan_title = dest_chan.get("channel_title", "Channel")
+            chan_title = html.escape(str(dest_chan.get("channel_title", "Channel")))
             await update.message.reply_text(f"📢 Also posted to: <b>{chan_title}</b>", parse_mode="HTML")
+
         if LOG_CHANNEL_ID:
             try:
                 log_caption = (
                     f"🎥 <b>Video Processed</b>\n"
-                    f"👤 User: <code>{user_id}</code> (@{username})\n"
-                    f"✍️ Font: <code>{get_font_name(font_style)}</code>\n"
-                    f"📝 Caption: {(new_caption[:80] if new_caption else 'No Caption')}"
+                    f"👤 User: <code>{user_id}</code> (@{html.escape(username)})\n"
+                    f"✍️ Font: <code>{html.escape(get_font_name(font_style))}</code>\n"
+                    f"📝 Mode: {'HTML' if use_html else 'Font'}\n"
+                    f"📝 Caption: {html.escape((new_caption or 'No Caption')[:80])}"
                 )
-                await context.bot.send_video(chat_id=LOG_CHANNEL_ID, video=video_id, caption=log_caption, supports_streaming=True, thumbnail=cover, parse_mode="HTML")
+                await context.bot.send_video(
+                    chat_id=LOG_CHANNEL_ID, video=video_id,
+                    caption=log_caption, supports_streaming=True,
+                    thumbnail=cover, parse_mode="HTML"
+                )
             except Exception:
                 pass
     except Exception as e:
         logger.error(f"Video processing failed: {e}", exc_info=True)
-        await update.message.reply_text(f"❌ Processing Failed: <code>{str(e)[:100]}</code>", parse_mode="HTML")
+        try:
+            await status_msg.edit_text(f"❌ Processing Failed: <code>{html.escape(str(e)[:100])}</code>", parse_mode="HTML")
+        except Exception:
+            await update.message.reply_text(f"❌ Processing Failed: <code>{html.escape(str(e)[:100])}</code>", parse_mode="HTML")
 
 
 async def text_and_channel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -234,20 +307,35 @@ async def text_and_channel_handler(update: Update, context: ContextTypes.DEFAULT
         if raw.lower() in ("/cancel", "cancel"):
             context.user_data.pop("waiting_for", None)
             return await update.message.reply_text("❌ Caption setup cancelled.", parse_mode="HTML")
+
         save_custom_caption(user_id, raw)
         context.user_data.pop("waiting_for", None)
+
+        is_html = looks_like_html(raw)
+        preview = html.escape(raw[:400])
+        mode_note = "🔗 HTML mode (links + bold will work)" if is_html else "✍️ Plain / Font mode"
+
         text = (
             "✅ <b>Auto Caption Template Saved!</b>\n\n"
-            f"<code>{raw[:300]}</code>\n\n"
-            "📌 <code>{{filename}}</code> → video name\n"
-            "📌 <code>{{original}}</code> → original caption\n\n"
-            "Ab har video pe ye caption auto lagega + your font."
+            f"{mode_note}\n\n"
+            f"<b>Template:</b>\n<code>{preview}</code>\n\n"
+            "📌 Placeholders:\n"
+            "• <code>{filename}</code> or <code>{file_name}</code> → video name\n"
+            "• <code>{original}</code> → original caption\n\n"
+            "Ab har video pe ye caption auto lagega."
         )
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("📝 View / Edit", callback_data="submenu_caption")],
             [InlineKeyboardButton("⚙️ Settings", callback_data="menu_settings")]
         ])
-        return await update.message.reply_text(text, reply_markup=kb, parse_mode="HTML")
+        try:
+            return await update.message.reply_text(text, reply_markup=kb, parse_mode="HTML")
+        except Exception as e:
+            logger.error(f"Caption save confirm failed: {e}")
+            return await update.message.reply_text(
+                "✅ Caption template saved!\n\nAb video bhejo — auto apply hoga.",
+                reply_markup=kb
+            )
 
     if waiting_for == "destination_channel" or (fwd_chat and fwd_chat.type == "channel"):
         channel_input = None
@@ -280,15 +368,21 @@ async def text_and_channel_handler(update: Update, context: ContextTypes.DEFAULT
             bot_member = await context.bot.get_chat_member(chat_id=chat.id, user_id=context.bot.id)
             if bot_member.status not in ("administrator", "creator"):
                 return await verify_msg.edit_text(
-                    f"⚠️ Bot is not Admin in '{chat.title}'\n\nAdd bot as Admin with Post Messages permission.",
+                    f"⚠️ Bot is not Admin in '{html.escape(chat.title or '')}'\n\nAdd bot as Admin with Post Messages permission.",
                     parse_mode="HTML"
                 )
-            save_destination_channel(user_id=user_id, channel_id=chat.id, channel_title=chat.title or "Channel", channel_username=chat.username or "")
+            save_destination_channel(
+                user_id=user_id, channel_id=chat.id,
+                channel_title=chat.title or "Channel",
+                channel_username=chat.username or ""
+            )
             context.user_data.pop("waiting_for", None)
-            mode_label = "Both" if get_send_mode(user_id) == "both" else ("Channel Only" if get_send_mode(user_id) == "channel_only" else "Chat Only")
+            mode_label = "Both" if get_send_mode(user_id) == "both" else (
+                "Channel Only" if get_send_mode(user_id) == "channel_only" else "Chat Only"
+            )
             text = (
                 f"✅ <b>Channel Connected!</b>\n\n"
-                f"📢 <b>{chat.title}</b>\n"
+                f"📢 <b>{html.escape(chat.title or 'Channel')}</b>\n"
                 f"🆔 <code>{chat.id}</code>\n"
                 f"📤 Mode: <code>{mode_label}</code>"
             )
@@ -298,4 +392,7 @@ async def text_and_channel_handler(update: Update, context: ContextTypes.DEFAULT
             ])
             await verify_msg.edit_text(text, reply_markup=kb, parse_mode="HTML")
         except Exception as e:
-            await verify_msg.edit_text(f"❌ Connection failed: <code>{str(e)[:120]}</code>", parse_mode="HTML")
+            await verify_msg.edit_text(
+                f"❌ Connection failed: <code>{html.escape(str(e)[:120])}</code>",
+                parse_mode="HTML"
+            )
