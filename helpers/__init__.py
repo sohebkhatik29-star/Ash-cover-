@@ -1,3 +1,1 @@
-"""
-Helper modules for Ash Cover Bot
-"""
+"""Helper modules for Ash Cover Bot"""
